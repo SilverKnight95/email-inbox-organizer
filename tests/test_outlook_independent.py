@@ -5,9 +5,18 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
+sys.path.insert(0, str(ROOT / "scripts"))
 
 from email_inbox_organizer.graph_auth import authorize_url, exchange_code, refresh_access_token
-from email_inbox_organizer.outlook_adapter import ReadOnlyGraph, apply_filing, dry_run_account
+from outlook_authorize import parse_callback
+from email_inbox_organizer.outlook_adapter import (
+    ReadOnlyGraph,
+    accept_refreshed_token,
+    apply_filing,
+    dry_run_account,
+    list_inbox,
+)
+from email_inbox_organizer.run_status import finalize_run
 from email_inbox_organizer.schedule import SlotStore, begin_scheduled_run, chicago_slot
 
 RULES = json.loads((ROOT / "config" / "rules.example.json").read_text())
@@ -44,7 +53,7 @@ def test_dry_run_is_read_only_and_counts_review_mail():
 
     def transport(method, path, query, body):
         calls.append(method)
-        if path.endswith("/messages") and query.get("$skip") == "0":
+        if path.endswith("/messages"):
             return {"value": MESSAGES}
         return {"value": []}
 
@@ -69,6 +78,94 @@ def test_apply_stays_disabled():
         assert "disabled" in str(exc)
     else:
         raise AssertionError("expected live filing to stay disabled")
+
+
+def test_callback_rejects_a_state_mismatch():
+    try:
+        parse_callback("http://127.0.0.1:8787/callback?code=abc&state=other", "expected")
+    except SystemExit as exc:
+        assert "state mismatch" in str(exc)
+    else:
+        raise AssertionError("mismatched state must be refused")
+    assert parse_callback("http://127.0.0.1:8787/callback?code=abc&state=expected", "expected") == "abc"
+
+
+def test_replacement_refresh_token_must_be_saved_before_success():
+    saved = []
+
+    def save(token):
+        saved.append(token)
+
+    access = accept_refreshed_token(
+        "refresh-old",
+        {"access_token": "access-new", "refresh_token": "refresh-new", "expires_in": 3600},
+        save,
+    )
+    assert access == "access-new"
+    assert saved == ["refresh-new"]
+
+    def fail_save(_token):
+        raise RuntimeError("vault write failed")
+
+    try:
+        accept_refreshed_token(
+            "refresh-old",
+            {"access_token": "access-new", "refresh_token": "refresh-rotated"},
+            fail_save,
+        )
+    except RuntimeError as exc:
+        assert "vault write failed" in str(exc)
+    else:
+        raise AssertionError("unsaved rotation must not succeed")
+
+
+def test_next_link_pagination_and_incomplete_scan():
+    pages = {
+        "/me/mailFolders/inbox/messages": {
+            "value": [{"id": "1", "subject": "Club newsletter", "isRead": True, "from": {"emailAddress": {"address": "deals@news.example"}}}],
+            "@odata.nextLink": "https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages?$skiptoken=page2",
+        },
+        "/me/mailFolders/inbox/messages?$skiptoken=page2": {
+            "value": [{"id": "2", "subject": "Hello there", "isRead": True, "from": {"emailAddress": {"address": "person@example.com"}}}],
+        },
+    }
+
+    def transport(method, path, query, body):
+        assert method == "GET"
+        return pages[path]
+
+    messages, complete = list_inbox(ReadOnlyGraph(transport))
+    assert complete is True
+    assert [item["id"] for item in messages] == ["1", "2"]
+
+    def failing(_method, path, _query, _body):
+        if "page2" in path:
+            raise RuntimeError("mailbox read failed")
+        return pages["/me/mailFolders/inbox/messages"]
+
+    try:
+        list_inbox(ReadOnlyGraph(failing))
+    except RuntimeError:
+        incomplete = True
+    else:
+        incomplete = False
+    assert incomplete is True
+
+
+def test_failed_writes_and_partial_scans_are_visible():
+    assert finalize_run(
+        [{"complete": True, "error": None}],
+        [{"ok": True, "op": "save"}],
+    ) == "dry_run_complete"
+    assert finalize_run(
+        [{"complete": False, "error": "partial scan"}],
+        [{"ok": True, "op": "save"}],
+    ) == "incomplete"
+    assert finalize_run(
+        [{"complete": False, "error": "token rotation was not saved"}],
+        [{"ok": False, "op": "store_token"}],
+    ) == "failed"
+    assert finalize_run([], [{"ok": False, "op": "claim"}]) == "failed"
 
 
 def test_monday_and_thursday_chicago_slot_and_duplicate_guard():

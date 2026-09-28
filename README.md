@@ -1,48 +1,34 @@
 # Email Inbox Organizer
 
-Policy and configuration examples for sorting personal mail, opting out of marketing lists, and trashing only marketing whose opt-out succeeded.
+Independent dry-run sorter for three personal Outlook accounts. It uses Microsoft Graph, not the Gamut mailbox proxy.
 
-This repository does not contain mailbox contents, sender address lists, contact lists, account identifiers, or credentials. Those stay in the private agent workspace.
+This repository does not contain mailbox contents, sender address lists, contact lists, account identifiers, or credentials.
 
 ## Boundaries
 
-- The independent version covers three personal Outlook accounts only. Gmail is excluded. A school mailbox is not connected and must not be added.
-- Live filing stays disabled until a dry run has been reviewed. The scheduled function cannot move, send, unsubscribe, or trash mail.
-- Unread mail stays in the inbox. Flagged mail stays in the inbox.
-- School, government, orders, bills, shipping, health, security, and uncertain mail are protected.
-- Nothing in this repository sends, moves, or deletes mail by itself.
-
-## What each run is allowed to do
-
-| Run | Cadence | Files read mail | Leaves unread | Sends mail | Trashes mail |
-|---|---|---|---|---|---|
-| Scheduled sort | Monday and Thursday, 8:00 a.m. America/Chicago | Yes, rules only | Yes | No | No |
-| Unsubscribe | Manual, after an explicit request | No | Yes | Only list-unsubscribe messages, and only when requested | No |
-| Spam review | Manual, after an explicit request | No | Yes | No | Only marketing from lists whose opt-out succeeded |
-
-See [docs/ACTIONS.md](docs/ACTIONS.md) for the exact leave / file / trash rules.
+- Three personal Outlook accounts only. Gmail is not part of this version.
+- A school mailbox is not connected and cannot be stored.
+- The scheduled job is a dry run. Live filing stays disabled until a reviewed dry run.
+- Unread and flagged mail stay in the inbox.
+- Protected or uncertain mail stays for review. The job does not unsubscribe, send, or trash.
+- The Gamut agent and its schedule are unchanged.
 
 ## Layout
 
-- `src/email_inbox_organizer/` — decisions that can be tested with no mailbox access
-- `config/rules.example.json` — synthetic rules showing the schema
-- `config/domain_and_subject_rules.json` — real domain and subject rules, with every sender address removed
-- `config/accounts.example.json` — three personal Outlook slots, placeholders only
-- `config/schedule.example.json` — Monday/Thursday 8:00 a.m. Chicago dry run
-- `docs/OUTLOOK_INDEPENDENT.md` — Graph auth, Vault storage, and the Supabase function
-- `supabase/functions/outlook-sort` — scheduled dry run. Live filing is disabled
+- `src/email_inbox_organizer/` — filing decisions, Graph pagination, token rotation, and run status
+- `config/accounts.example.json` — three personal Outlook placeholders
+- `config/rules.example.json` — synthetic rules
+- `config/domain_and_subject_rules.json` — domain and subject rules, with sender addresses removed
+- `supabase/functions/outlook-sort` — scheduled dry run
+- `supabase/schedule.sql` — prepared cron, not activated
+- `docs/SETUP.md` — authorization callback and deployment order
 - `tests/fixtures/` — synthetic messages only
 
-## Run the tests
+## Tests
 
 ```bash
+python3 tests/test_outlook_independent.py
 python3 tests/test_policies.py
 ```
 
 No network and no mail account is required.
-
-## What still depends on Gamut
-
-Live filing, unsubscribe delivery, and trash need Gamut's connected-account proxy and local account ids. Do not commit those values. The Monday/Thursday job is a Gamut scheduled task, not a cron job in this repo. One-click unsubscribe POSTs go to each list's own HTTPS endpoint and do not need Gamut once a `List-Unsubscribe` URL is already in hand. Collecting those URLs from a mailbox does need the Gmail connection.
-
-Do not commit `accounts.json`, logs, digests, unsubscribe results, or `.env`.

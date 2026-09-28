@@ -2,6 +2,8 @@
 
 This version sorts three personal Outlook accounts through Microsoft Graph. It does not use the Gamut mailbox proxy. Gmail is not part of this version. A school mailbox is not connected and the database rejects a school or college label.
 
+The exact callback and deployment order is in [SETUP.md](SETUP.md). Do not activate `supabase/schedule.sql` until that dry run has been reviewed.
+
 ## Authorization
 
 Personal Outlook accounts use the `consumers` tenant.
@@ -13,7 +15,7 @@ Personal Outlook accounts use the `consumers` tenant.
 5. Exchange the code, then store only the refresh token in Supabase Vault.
 6. Put the Azure client id and secret in Supabase function secrets, not in git.
 
-The edge function refreshes the access token on each run and does not return it.
+The edge function refreshes the access token on each run and does not return it. If Microsoft returns a different refresh token, that replacement is written to Vault before the account can be marked successful. A scan that stops before `@odata.nextLink` is exhausted is `incomplete`, not a complete count. Failed token saves, result writes, and status updates mark the run `failed`.
 
 ## Dry run
 

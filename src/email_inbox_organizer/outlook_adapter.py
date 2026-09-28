@@ -1,12 +1,16 @@
 """Read-only dry run and gated filing for personal Outlook accounts.
 
 Graph writes are refused unless apply is explicitly enabled. The scheduled job
-never enables apply.
+never enables apply. Inbox reads follow @odata.nextLink. A scan that stops
+early is incomplete and must not be reported as a full count.
 """
+
+from urllib.parse import urlparse
 
 from email_inbox_organizer.classify import classify
 
-GRAPH = "https://graph.microsoft.com/v1.0"
+GRAPH_HOST = "graph.microsoft.com"
+MAX_MESSAGES = 10000
 
 
 class GraphError(RuntimeError):
@@ -23,25 +27,41 @@ class ReadOnlyGraph:
         return self.transport(method, path, query, body)
 
 
+def graph_path(link):
+    if not link:
+        return None
+    if link.startswith("/"):
+        return link
+    parsed = urlparse(link)
+    if parsed.netloc != GRAPH_HOST:
+        raise GraphError("unexpected Graph next link")
+    path = parsed.path
+    if path.startswith("/v1.0"):
+        path = path[len("/v1.0"):]
+    if parsed.query:
+        path = f"{path}?{parsed.query}"
+    return path
+
+
 def list_inbox(graph):
-    skip = 0
-    while True:
-        page = graph.request(
-            "GET",
-            "/me/mailFolders/inbox/messages",
-            query={
-                "$top": "50",
-                "$skip": str(skip),
-                "$select": "id,subject,from,isRead,flag,parentFolderId",
-            },
-        )
+    path = "/me/mailFolders/inbox/messages"
+    query = {
+        "$top": "50",
+        "$select": "id,subject,from,isRead,flag,parentFolderId",
+    }
+    messages = []
+    while path:
+        page = graph.request("GET", path, query)
+        query = None
         values = page.get("value") or []
-        if not values:
-            break
-        yield from values
-        skip += len(values)
-        if skip > 5000:
-            break
+        messages.extend(values)
+        nxt = page.get("@odata.nextLink")
+        if not nxt:
+            return messages, True
+        if len(messages) >= MAX_MESSAGES:
+            return messages, False
+        path = graph_path(nxt)
+    return messages, True
 
 
 def summarize_account(messages, rules):
@@ -71,7 +91,23 @@ def summarize_account(messages, rules):
 
 
 def dry_run_account(graph, rules):
-    return summarize_account(list_inbox(graph), rules)
+    messages, complete = list_inbox(graph)
+    summary = summarize_account(messages, rules)
+    summary["complete"] = complete
+    if not complete:
+        summary["error"] = "partial scan"
+    return summary
+
+
+def accept_refreshed_token(previous_refresh, payload, save_refresh):
+    """Persist a replacement refresh token before the run may succeed."""
+    access = payload.get("access_token")
+    refreshed = payload.get("refresh_token")
+    if not access or not refreshed:
+        raise GraphError("token response incomplete")
+    if refreshed != previous_refresh:
+        save_refresh(refreshed)
+    return access
 
 
 def apply_filing(graph, rules, allow_apply=False):

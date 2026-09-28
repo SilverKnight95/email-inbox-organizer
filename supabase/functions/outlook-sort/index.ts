@@ -28,7 +28,13 @@ Deno.serve(async (request) => {
     return json({ action: "skip", reason: "duplicate", slot });
   }
 
-  const accounts = await supabase.accounts();
+  let accounts
+  try {
+    accounts = await supabase.accounts();
+  } catch {
+    await supabase.finish(claimed, "failed");
+    return json({ action: "failed", slot, error: "account list was not read" }, 500);
+  }
   const results = [];
   for (const account of accounts) {
     if (account.provider !== "outlook" || account.role !== "personal" || account.apply_enabled) {
@@ -37,20 +43,41 @@ Deno.serve(async (request) => {
     }
     try {
       const refreshToken = await supabase.token(account.id);
-      const access = await refreshAccessToken(refreshToken);
-      const messages = await listInbox(access);
-      const summary = classifyInbox(messages, rules);
-      await supabase.saveResult(claimed, account.id, summary);
-      results.push({ account_id: account.id, ...summary });
+      const refreshed = await refreshAccessToken(refreshToken);
+      if (refreshed.refreshToken !== refreshToken) {
+        await supabase.storeToken(account.id, refreshed.refreshToken);
+      }
+      const scan = await listInbox(refreshed.accessToken);
+      const summary = classifyInbox(scan.messages, rules);
+      summary.complete = scan.complete;
+      if (!scan.complete) {
+        summary.error = "partial scan";
+      }
+      await supabase.saveResult(claimed, account.id, summary, summary.error);
+      results.push({ account_id: account.id, complete: scan.complete, error: summary.error ?? null });
     } catch (error) {
       const message = error instanceof Error ? error.message : "account run failed";
-      await supabase.saveResult(claimed, account.id, emptySummary(), message);
-      results.push({ account_id: account.id, error: "account run failed" });
+      const saved = await supabase.saveResult(claimed, account.id, emptySummary(), message);
+      results.push({ account_id: account.id, complete: false, error: saved ? message : "result write failed" });
     }
   }
-  await supabase.finish(claimed);
-  return json({ action: "dry_run", slot, apply: false, results });
+  const status = runStatus(results);
+  const finished = await supabase.finish(claimed, status);
+  if (!finished) {
+    return json({ action: "failed", slot, error: "run status was not saved", results }, 500);
+  }
+  return json({ action: status, slot, apply: false, results }, status === "dry_run_complete" ? 200 : 500);
 });
+
+function runStatus(results: Array<{ complete?: boolean; error?: string | null }>) {
+  if (!results.length || results.some((result) => result.error && result.error !== "partial scan")) {
+    return "failed";
+  }
+  if (results.some((result) => result.complete === false)) {
+    return "incomplete";
+  }
+  return "dry_run_complete";
+}
 
 function emptySummary() {
   return {
@@ -89,15 +116,28 @@ function supabaseClient() {
         headers: { ...headers, prefer: "return=representation,resolution=ignore-duplicates" },
         body: JSON.stringify({ slot_key: slot, status: "running" }),
       });
+      if (response.status === 409) {
+        return null;
+      }
+      if (!response.ok) {
+        throw new Error("run claim was not saved");
+      }
       const rows = await response.json();
       return Array.isArray(rows) && rows[0] ? rows[0].id : null;
     },
     async accounts() {
       const response = await fetch(
-        `${url}/rest/v1/organizer_accounts?enabled=eq.true&provider=eq.outlook&role=eq.personal&select=id,provider,role,apply_enabled,token_secret_id&limit=3`,
+        `${url}/rest/v1/organizer_accounts?enabled=eq.true&provider=eq.outlook&role=eq.personal&select=id,provider,role,apply_enabled&limit=3`,
         { headers },
       );
-      return response.json();
+      if (!response.ok) {
+        throw new Error("account list was not read");
+      }
+      const rows = await response.json();
+      if (!Array.isArray(rows)) {
+        throw new Error("account list was not read");
+      }
+      return rows;
     },
     async token(accountId: string) {
       const response = await fetch(`${url}/rest/v1/rpc/organizer_refresh_token`, {
@@ -114,27 +154,44 @@ function supabaseClient() {
       }
       return token;
     },
-    async saveResult(runId: string, accountId: string, summary: ReturnType<typeof emptySummary>, error?: string) {
-      await fetch(`${url}/rest/v1/organizer_run_results`, {
+    async storeToken(accountId: string, token: string) {
+      const response = await fetch(`${url}/rest/v1/rpc/organizer_store_refresh_token`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ account_id: accountId, token }),
+      });
+      if (!response.ok) {
+        throw new Error("refresh token rotation was not saved");
+      }
+    },
+    async saveResult(runId: string, accountId: string, summary: ReturnType<typeof emptySummary> & { complete?: boolean }, error?: string) {
+      const response = await fetch(`${url}/rest/v1/organizer_run_results`, {
         method: "POST",
         headers,
         body: JSON.stringify({
           run_id: runId,
           account_id: accountId,
           mode: "dry_run",
-          ...summary,
+          inbox_scanned: summary.inbox_scanned,
+          would_file: summary.would_file,
+          left_unread: summary.left_unread,
+          left_flagged: summary.left_flagged,
+          left_for_review: summary.left_for_review,
           filed: 0,
+          complete: summary.complete === true && !error,
           error: error ?? null,
           summary: { by_folder: summary.by_folder },
         }),
       });
+      return response.ok;
     },
-    async finish(runId: string) {
-      await fetch(`${url}/rest/v1/organizer_runs?id=eq.${runId}`, {
+    async finish(runId: string, status: string) {
+      const response = await fetch(`${url}/rest/v1/organizer_runs?id=eq.${runId}`, {
         method: "PATCH",
-        headers,
-        body: JSON.stringify({ status: "dry_run_complete", finished_at: new Date().toISOString() }),
+        headers: { ...headers, prefer: "return=representation" },
+        body: JSON.stringify({ status, finished_at: new Date().toISOString() }),
       });
+      return response.ok;
     },
   };
 }
@@ -156,35 +213,30 @@ async function refreshAccessToken(refreshToken: string) {
     throw new Error("token refresh failed");
   }
   const payload = await response.json();
-  if (!payload.access_token) {
+  if (!payload.access_token || !payload.refresh_token) {
     throw new Error("token refresh failed");
   }
-  return payload.access_token as string;
+  return { accessToken: String(payload.access_token), refreshToken: String(payload.refresh_token) };
 }
 
 async function listInbox(accessToken: string) {
   const messages = [];
-  let skip = 0;
-  while (skip <= 5000) {
-    const url = new URL(`${GRAPH}/me/mailFolders/inbox/messages`);
-    url.searchParams.set("$top", "50");
-    url.searchParams.set("$skip", String(skip));
-    url.searchParams.set("$select", "id,subject,from,isRead,flag");
-    const response = await fetch(url, {
+  let next: string | null = `${GRAPH}/me/mailFolders/inbox/messages?$top=50&$select=id,subject,from,isRead,flag`;
+  while (next) {
+    const response = await fetch(next, {
       headers: { authorization: `Bearer ${accessToken}`, prefer: 'IdType="ImmutableId"' },
     });
     if (!response.ok) {
       throw new Error("mailbox read failed");
     }
     const page = await response.json();
-    const values = page.value ?? [];
-    if (!values.length) {
-      break;
+    messages.push(...(page.value ?? []));
+    next = page["@odata.nextLink"] ?? null;
+    if (next && messages.length >= 10000) {
+      return { messages, complete: false };
     }
-    messages.push(...values);
-    skip += values.length;
   }
-  return messages;
+  return { messages, complete: true };
 }
 
 export { classifyInbox };
