@@ -6,7 +6,8 @@ This repository does not contain mailbox contents, sender address lists, contact
 
 ## Boundaries
 
-- Four personal mailboxes are configured locally. A school mailbox is not connected and must not be added. The school blocked third-party access.
+- The independent version covers three personal Outlook accounts only. Gmail is excluded. A school mailbox is not connected and must not be added.
+- Live filing stays disabled until a dry run has been reviewed. The scheduled function cannot move, send, unsubscribe, or trash mail.
 - Unread mail stays in the inbox. Flagged mail stays in the inbox.
 - School, government, orders, bills, shipping, health, security, and uncertain mail are protected.
 - Nothing in this repository sends, moves, or deletes mail by itself.
@@ -26,8 +27,10 @@ See [docs/ACTIONS.md](docs/ACTIONS.md) for the exact leave / file / trash rules.
 - `src/email_inbox_organizer/` — decisions that can be tested with no mailbox access
 - `config/rules.example.json` — synthetic rules showing the schema
 - `config/domain_and_subject_rules.json` — real domain and subject rules, with every sender address removed
-- `config/accounts.example.json` — four personal slots, placeholders only
-- `config/schedule.example.json` — the live Monday/Thursday schedule, as documentation
+- `config/accounts.example.json` — three personal Outlook slots, placeholders only
+- `config/schedule.example.json` — Monday/Thursday 8:00 a.m. Chicago dry run
+- `docs/OUTLOOK_INDEPENDENT.md` — Graph auth, Vault storage, and the Supabase function
+- `supabase/functions/outlook-sort` — scheduled dry run. Live filing is disabled
 - `tests/fixtures/` — synthetic messages only
 
 ## Run the tests

@@ -1,0 +1,25 @@
+-- Prepare the Monday/Thursday 8:00 a.m. America/Chicago job.
+-- pg_cron uses the database clock, so this runs hourly and the function
+-- no-ops unless local Chicago time is Monday or Thursday at 08.
+-- The request body keeps apply false. Do not turn filing on here.
+--
+-- Run this only after the edge function is deployed. Replace the URL and
+-- store the bearer in Vault, not in this file.
+
+-- select vault.create_secret('https://PROJECT.supabase.co/functions/v1/outlook-sort', 'outlook_sort_url');
+-- select vault.create_secret('FUNCTION_BEARER', 'outlook_sort_bearer');
+
+-- select cron.schedule(
+--   'outlook-sort-chicago-window',
+--   '0 * * * *',
+--   $$
+--   select net.http_post(
+--     url := (select decrypted_secret from vault.decrypted_secrets where name = 'outlook_sort_url'),
+--     headers := jsonb_build_object(
+--       'Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'outlook_sort_bearer'),
+--       'Content-Type', 'application/json'
+--     ),
+--     body := '{"apply": false}'::jsonb
+--   );
+--   $$
+-- );

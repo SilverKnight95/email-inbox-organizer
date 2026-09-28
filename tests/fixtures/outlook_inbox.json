@@ -1,0 +1,33 @@
+[
+  {
+    "id": "msg-unread",
+    "subject": "Club newsletter",
+    "isRead": false,
+    "from": {"emailAddress": {"address": "deals@news.example", "name": "Deals"}}
+  },
+  {
+    "id": "msg-flagged",
+    "subject": "Club newsletter",
+    "isRead": true,
+    "flag": {"flagStatus": "flagged"},
+    "from": {"emailAddress": {"address": "deals@news.example", "name": "Deals"}}
+  },
+  {
+    "id": "msg-read-newsletter",
+    "subject": "Club newsletter",
+    "isRead": true,
+    "from": {"emailAddress": {"address": "deals@news.example", "name": "Deals"}}
+  },
+  {
+    "id": "msg-security",
+    "subject": "Your verification code",
+    "isRead": true,
+    "from": {"emailAddress": {"address": "alerts@bank.example", "name": "Bank"}}
+  },
+  {
+    "id": "msg-unknown",
+    "subject": "Hello there",
+    "isRead": true,
+    "from": {"emailAddress": {"address": "person@example.com", "name": "Person"}}
+  }
+]

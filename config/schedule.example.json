@@ -1,22 +1,28 @@
 {
-  "name": "Weekday inbox sort",
+  "name": "Outlook dry-run sort",
   "timezone": "America/Chicago",
-  "cron": "0 8 * * 1,4",
-  "human": "Monday and Thursday at 8:00 a.m. Central",
-  "command": "python3 scripts/sort_all.py --apply",
+  "window": "Monday and Thursday at 8:00 a.m.",
+  "checker_cron": "0 * * * *",
+  "checker_note": "Hourly checker. The function no-ops unless America/Chicago is Monday or Thursday at hour 08. This keeps the window correct across daylight time.",
+  "function": "supabase/functions/outlook-sort",
+  "request_body": {"apply": false},
+  "accounts": 3,
+  "provider": "outlook",
   "does": [
-    "File read mail that matches rules into the mapped folder or label",
-    "Leave every unread message in the inbox",
-    "Leave flagged mail in the inbox",
-    "Do not delete mail",
-    "Do not send mail",
-    "Do not add accounts",
-    "Do not widen rules during the run",
-    "Reply with a short per-account summary"
+    "Refresh tokens from private storage",
+    "Read inbox metadata",
+    "Count read mail that rules would file",
+    "Leave unread and flagged mail in the inbox",
+    "Leave unmatched, protected, and uncertain mail for review",
+    "Store per-account counts",
+    "Refuse a second run in the same Chicago slot"
   ],
   "does_not": [
+    "File or move mail",
     "Unsubscribe",
-    "Move mail to Trash or Deleted Items",
-    "Touch a school mailbox"
+    "Send mail",
+    "Trash or delete mail",
+    "Include Gmail",
+    "Connect a school mailbox"
   ]
 }

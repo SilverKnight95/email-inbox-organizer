@@ -1,26 +1,23 @@
 [
   {
+    "label": "personal-outlook-1",
     "provider": "outlook",
-    "email": "primary@example.com",
-    "id": "OUTLOOK_ACCOUNT_ID_1",
-    "role": "primary personal"
+    "role": "personal",
+    "tenant": "consumers",
+    "id": "OUTLOOK_ACCOUNT_ID_1"
   },
   {
+    "label": "personal-outlook-2",
     "provider": "outlook",
-    "email": "second@example.com",
-    "id": "OUTLOOK_ACCOUNT_ID_2",
-    "role": "personal"
+    "role": "personal",
+    "tenant": "consumers",
+    "id": "OUTLOOK_ACCOUNT_ID_2"
   },
   {
+    "label": "personal-outlook-3",
     "provider": "outlook",
-    "email": "third@example.com",
-    "id": "OUTLOOK_ACCOUNT_ID_3",
-    "role": "personal"
-  },
-  {
-    "provider": "gmail",
-    "email": "oldest@example.com",
-    "id": "GMAIL_ACCOUNT_ID",
-    "role": "oldest personal"
+    "role": "personal",
+    "tenant": "consumers",
+    "id": "OUTLOOK_ACCOUNT_ID_3"
   }
 ]

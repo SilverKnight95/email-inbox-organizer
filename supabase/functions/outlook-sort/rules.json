@@ -1,0 +1,1048 @@
+{
+  "note": "Sender-address rules are omitted. They are email addresses and stay in the private agent workspace.",
+  "auto_file": [
+    {
+      "match": "subject",
+      "value": "(password|passcode|one-time|verification code|verify your|sign[- ]?in|signed in|security code|identity verification|activate your account|confirm your (email|signup|account)|secure link to log in)",
+      "folder": "Security",
+      "reason": "Sign-in and verification",
+      "bypass_safety": true
+    },
+    {
+      "match": "subject",
+      "value": "(shipped:|delivered:|ordered:|tracking number|expected delivery|your order|order #|has been delivered|thank you for your order|order's still on hold)",
+      "folder": "Orders",
+      "reason": "Order or shipment",
+      "bypass_safety": true
+    },
+    {
+      "match": "subject",
+      "value": "(invoice|statement is ready|statement available|your statement|payment processed|bill is ready|wireless bill|payment reminder|missed your last payment)",
+      "folder": "Finance",
+      "reason": "Bill or statement",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "xbox.com",
+      "folder": "Entertainment",
+      "reason": "Xbox",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "ubisoft.com",
+      "folder": "Entertainment",
+      "reason": "Ubisoft",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "sheerid.com",
+      "folder": "Security",
+      "reason": "Verification",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "creditkarma.com",
+      "folder": "Finance",
+      "reason": "Credit Karma",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "lookout.com",
+      "folder": "Newsletters",
+      "reason": "Lookout",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "unroll.me",
+      "folder": "Newsletters",
+      "reason": "Unroll.me",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "krogermail.com",
+      "folder": "Newsletters",
+      "reason": "Kroger",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "starbucks.com",
+      "folder": "Orders",
+      "reason": "Starbucks",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "officedepot.com",
+      "folder": "Newsletters",
+      "reason": "Office Depot",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "ancestry.com",
+      "folder": "Newsletters",
+      "reason": "Ancestry",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "survivallife.com",
+      "folder": "Newsletters",
+      "reason": "Survival Life",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "glassdoor.com",
+      "folder": "Newsletters",
+      "reason": "Glassdoor",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "wish.com",
+      "folder": "Newsletters",
+      "reason": "Wish",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "indeed.com",
+      "folder": "Newsletters",
+      "reason": "Indeed",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "mcdonalds.com",
+      "folder": "Newsletters",
+      "reason": "McDonald's",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "fitbit.com",
+      "folder": "Health",
+      "reason": "Fitbit",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "lootcrate.com",
+      "folder": "Entertainment",
+      "reason": "Loot Crate",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "nextdoor.com",
+      "folder": "Local",
+      "reason": "Nextdoor",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "garlandtx.gov",
+      "folder": "Local",
+      "reason": "City of Garland",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "gamutagents.com",
+      "folder": "Newsletters",
+      "reason": "Gamut",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "safe-sender.net",
+      "folder": "Newsletters",
+      "reason": "Survey promo",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "studentaid.gov",
+      "folder": "School",
+      "reason": "Student aid",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "dcccd.edu",
+      "folder": "School",
+      "reason": "Dallas College",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "dallascollege.edu",
+      "folder": "School",
+      "reason": "Dallas College",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "wiley.com",
+      "folder": "School",
+      "reason": "Scholar access",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "betterhelp.com",
+      "folder": "Health",
+      "reason": "BetterHelp",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "bswhealth.org",
+      "folder": "Health",
+      "reason": "Baylor Scott & White",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "pgsurveying.com",
+      "folder": "Health",
+      "reason": "Baylor survey",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "texashealth.org",
+      "folder": "Health",
+      "reason": "Texas Health",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "abbvie.com",
+      "folder": "Health",
+      "reason": "AbbVie",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "labcorp.com",
+      "folder": "Health",
+      "reason": "Labcorp",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "labcorpmessage.com",
+      "folder": "Health",
+      "reason": "Labcorp",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "novellia.com",
+      "folder": "Health",
+      "reason": "Novellia",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "cigna.com",
+      "folder": "Health",
+      "reason": "Cigna",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "healthcare.gov",
+      "folder": "Health",
+      "reason": "Marketplace",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "ultrahuman.com",
+      "folder": "Health",
+      "reason": "Ultrahuman",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "goodrx.com",
+      "folder": "Health",
+      "reason": "GoodRx",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "withings.com",
+      "folder": "Health",
+      "reason": "Withings",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "doctegrity.com",
+      "folder": "Health",
+      "reason": "Doctegrity",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "trianglehealth.com",
+      "folder": "Health",
+      "reason": "Triangle Health",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "useorigin.com",
+      "folder": "Finance Newsletters",
+      "reason": "Origin",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "cutx.org",
+      "folder": "Finance",
+      "reason": "Credit Union of Texas",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "equifax.com",
+      "folder": "Finance",
+      "reason": "Equifax",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "rbfcu.org",
+      "folder": "Finance",
+      "reason": "RBFCU",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "plaid.com",
+      "folder": "Finance",
+      "reason": "Plaid",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "enoticesystem.com",
+      "folder": "Finance",
+      "reason": "Payment reminder",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "experian.com",
+      "folder": "Finance",
+      "reason": "Experian",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "fisglobal.com",
+      "folder": "Finance",
+      "reason": "ChexSystems",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "chexsystems.onalertid.com",
+      "folder": "Finance",
+      "reason": "ChexSystems",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "yendo.com",
+      "folder": "Finance",
+      "reason": "Yendo",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "paypal.com",
+      "folder": "Finance",
+      "reason": "PayPal",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "transunion.com",
+      "folder": "Finance",
+      "reason": "TransUnion",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "intuit.com",
+      "folder": "Finance",
+      "reason": "Intuit",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "empower.com",
+      "folder": "Finance Newsletters",
+      "reason": "Empower",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "geico.com",
+      "folder": "Finance Newsletters",
+      "reason": "GEICO",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "trustage.com",
+      "folder": "Finance Newsletters",
+      "reason": "TruStage",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "sofi.com",
+      "folder": "Finance Newsletters",
+      "reason": "SoFi marketing",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "sofi.org",
+      "folder": "Finance",
+      "reason": "SoFi account",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "onedigitaltrust.com",
+      "folder": "Finance",
+      "reason": "CUTX",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "monarch.com",
+      "folder": "Finance Newsletters",
+      "reason": "Monarch",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "att-mail.com",
+      "folder": "Finance",
+      "reason": "AT&T account",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "att.com",
+      "folder": "Finance",
+      "reason": "AT&T",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "costco.com",
+      "folder": "Orders",
+      "reason": "Costco",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "usps.com",
+      "folder": "Orders",
+      "reason": "USPS tracking",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "usps.gov",
+      "folder": "Orders",
+      "reason": "USPS",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "ups.com",
+      "folder": "Orders",
+      "reason": "UPS",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "fedex.com",
+      "folder": "Orders",
+      "reason": "FedEx",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "amazon.com",
+      "folder": "Orders",
+      "reason": "Amazon orders",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "target.com",
+      "folder": "Orders",
+      "reason": "Target",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "lenovo.com",
+      "folder": "Orders",
+      "reason": "Lenovo",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "aftershiptracking.com",
+      "folder": "Orders",
+      "reason": "Shipment tracking",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "shop.app",
+      "folder": "Orders",
+      "reason": "Shop",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "squaretrade.com",
+      "folder": "Orders",
+      "reason": "Protection plan",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "asurion.com",
+      "folder": "Orders",
+      "reason": "Protection plan",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "paddle.com",
+      "folder": "Orders",
+      "reason": "Order receipt",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "spotify.com",
+      "folder": "Entertainment",
+      "reason": "Spotify",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "steampowered.com",
+      "folder": "Entertainment",
+      "reason": "Steam",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "crunchyroll.com",
+      "folder": "Entertainment",
+      "reason": "Crunchyroll",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "amazonmusic.com",
+      "folder": "Entertainment",
+      "reason": "Amazon Music",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "planetfitness.com",
+      "folder": "Entertainment",
+      "reason": "Planet Fitness",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "umusic-online.com",
+      "folder": "Entertainment",
+      "reason": "Universal Music",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "whoop.com",
+      "folder": "Newsletters",
+      "reason": "WHOOP",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "shovelapp.io",
+      "folder": "Newsletters",
+      "reason": "Shovel",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "shovelapp.co",
+      "folder": "Newsletters",
+      "reason": "Shovel",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "pdffiller.com",
+      "folder": "Newsletters",
+      "reason": "pdfFiller",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "eero.com",
+      "folder": "Newsletters",
+      "reason": "eero",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "claude.com",
+      "folder": "Newsletters",
+      "reason": "Claude marketing",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "deepnote.com",
+      "folder": "Newsletters",
+      "reason": "Deepnote",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "superhuman.com",
+      "folder": "Newsletters",
+      "reason": "Superhuman",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "mermaidchart.com",
+      "folder": "Newsletters",
+      "reason": "Mermaid",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "tiiny.ai",
+      "folder": "Newsletters",
+      "reason": "Tiiny",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "malwarebytes.com",
+      "folder": "Newsletters",
+      "reason": "Malwarebytes",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "keepersecurity.com",
+      "folder": "Newsletters",
+      "reason": "Keeper",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "acr.org",
+      "folder": "Newsletters",
+      "reason": "ACR",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "acra.org",
+      "folder": "Newsletters",
+      "reason": "ACR",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "duegooder.com",
+      "folder": "Newsletters",
+      "reason": "Due Gooder",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "useduegooder.com",
+      "folder": "Newsletters",
+      "reason": "Due Gooder",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "formspree.io",
+      "folder": "Newsletters",
+      "reason": "Formspree",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "cvshealth.com",
+      "folder": "Newsletters",
+      "reason": "CVS terms",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "cvs.com",
+      "folder": "Newsletters",
+      "reason": "CVS",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "xoom.com",
+      "folder": "Newsletters",
+      "reason": "Xoom promo",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "topdon.com",
+      "folder": "Newsletters",
+      "reason": "TOPDON",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "pxsmail.com",
+      "folder": "Orders",
+      "reason": "Black Rock receipt",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "medallia.com",
+      "folder": "Newsletters",
+      "reason": "Store survey",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "qualtrics-survey.com",
+      "folder": "Newsletters",
+      "reason": "Survey",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "momos.com",
+      "folder": "Newsletters",
+      "reason": "Cafe survey",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "br.coffee",
+      "folder": "Newsletters",
+      "reason": "Black Rock",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "soundcore.com",
+      "folder": "Newsletters",
+      "reason": "soundcore",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "eufymega.com",
+      "folder": "Newsletters",
+      "reason": "eufy",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "obsidian.md",
+      "folder": "Tech",
+      "reason": "Obsidian",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "calligraphr.com",
+      "folder": "Newsletters",
+      "reason": "Calligraphr",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "latimer.ai",
+      "folder": "Newsletters",
+      "reason": "Latimer",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "scienceconnect.io",
+      "folder": "School",
+      "reason": "Scholar Gateway",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "massageenvy.com",
+      "folder": "Newsletters",
+      "reason": "Massage Envy",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "steelseries.com",
+      "folder": "Newsletters",
+      "reason": "SteelSeries",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "directv-mail.com",
+      "folder": "Newsletters",
+      "reason": "DIRECTV",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "strava.com",
+      "folder": "Newsletters",
+      "reason": "Strava",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "ozlosleep.com",
+      "folder": "Newsletters",
+      "reason": "Ozlo",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "ifttt.com",
+      "folder": "Newsletters",
+      "reason": "IFTTT",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "weatherbug.com",
+      "folder": "Newsletters",
+      "reason": "WeatherBug",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "adobe.com",
+      "folder": "Newsletters",
+      "reason": "Adobe",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "myscript.com",
+      "folder": "Tech",
+      "reason": "MyScript",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "firefox.com",
+      "folder": "Tech",
+      "reason": "Firefox",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "heb.com",
+      "folder": "Orders",
+      "reason": "H-E-B",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "link.com",
+      "folder": "Finance",
+      "reason": "Link",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "cloudflare.com",
+      "folder": "Tech",
+      "reason": "Cloudflare",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "supabase.com",
+      "folder": "Tech",
+      "reason": "Supabase",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "supabase.io",
+      "folder": "Tech",
+      "reason": "Supabase",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "amazonaws.com",
+      "folder": "Tech",
+      "reason": "AWS",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "aws",
+      "folder": "Tech",
+      "reason": "AWS",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "microsoft.com",
+      "folder": "Tech",
+      "reason": "Microsoft",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "netlify.com",
+      "folder": "Tech",
+      "reason": "Netlify",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "zenodo.org",
+      "folder": "Tech",
+      "reason": "Zenodo",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "anthropic.com",
+      "folder": "Tech",
+      "reason": "Anthropic",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "twilio.com",
+      "folder": "Tech",
+      "reason": "Twilio",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "nordaccount.com",
+      "folder": "Security",
+      "reason": "Nord",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "ppops.net",
+      "folder": "Security",
+      "reason": "Proofpoint",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "ismartlife.me",
+      "folder": "Tech",
+      "reason": "Device account",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "mypaymentvault.com",
+      "folder": "Finance",
+      "reason": "Payment vault",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "txt.texas.gov",
+      "folder": "Important",
+      "reason": "Texas account change",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain_suffix",
+      "value": "onetrust.com",
+      "folder": "Entertainment",
+      "reason": "Crunchyroll account request",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain",
+      "value": "cutx.org",
+      "folder": "Finance",
+      "reason": "Credit Union of Texas, confirmed 2026-09-27",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain",
+      "value": "vercel.com",
+      "folder": "GITHUB",
+      "reason": "GitHub, confirmed 2026-09-27",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain",
+      "value": "studentaid.gov",
+      "folder": "School",
+      "reason": "School, confirmed 2026-09-27",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain",
+      "value": "betterhelp.com",
+      "folder": "Health",
+      "reason": "Health, confirmed 2026-09-27",
+      "bypass_safety": true
+    },
+    {
+      "match": "domain",
+      "value": "id.me",
+      "folder": "Important",
+      "reason": "ID.me, confirmed 2026-09-27",
+      "bypass_safety": true
+    }
+  ]
+}
