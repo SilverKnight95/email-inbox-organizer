@@ -69,6 +69,8 @@ The run key is stored as `manual:review001`. A second call with the same key is 
 
 A complete run has status `dry_run_complete` and one result per account with `complete = true` and `filed = 0`. `incomplete` means a mailbox was not fully scanned. `failed` means a token, rotation save, or database write failed. Results are counts only.
 
+To review the proposed moves before enabling anything, use a **new** manual run key and add `"preview": true` to the request body. The authenticated response includes `proposed_moves` for each completed account, with sender address, subject, and destination folder. It never includes message bodies or tokens, and the database still stores counts only. Preview is rejected for scheduled runs. Treat the response as private mail metadata; save it only outside the repository if needed. `"apply": true` remains disabled.
+
 ## 6. Leave the schedule inactive
 
 `supabase/schedule.sql` is the Monday/Thursday 8:00 a.m. America/Chicago checker. Do not run it until the dry run above has been reviewed. It posts `{"apply": false}` and does not file mail.

@@ -2,7 +2,7 @@
 // Gmail is not handled. A school mailbox must not be stored.
 
 import { invocationAllowed, resolveSlot, runStatus } from "./auth.ts";
-import { classifyInbox } from "./policy.ts";
+import { classifyInbox, previewMoves } from "./policy.ts";
 import rules from "./rules.json" with { type: "json" };
 
 const GRAPH = "https://graph.microsoft.com/v1.0";
@@ -16,6 +16,9 @@ Deno.serve(async (request) => {
     return json({ error: "unauthorized" }, 401);
   }
   const body = await request.json().catch(() => ({}));
+  if (body.preview === true && body.manual !== true) {
+    return json({ error: "preview requires a manual run" }, 400);
+  }
   let resolved
   try {
     resolved = resolveSlot(body, new Date());
@@ -71,6 +74,9 @@ Deno.serve(async (request) => {
         complete: saved ? scan.complete : false,
         stored: saved,
         error: saved ? (summary.error ?? null) : "result write failed",
+        ...(body.preview === true && saved && scan.complete
+          ? { account_label: account.label, proposed_moves: previewMoves(scan.messages, rules) }
+          : {}),
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : "account run failed";
@@ -139,7 +145,7 @@ function supabaseClient() {
     },
     async accounts() {
       const response = await fetch(
-        `${url}/rest/v1/organizer_accounts?enabled=eq.true&provider=eq.outlook&role=eq.personal&select=id,provider,role,apply_enabled&limit=3`,
+        `${url}/rest/v1/organizer_accounts?enabled=eq.true&provider=eq.outlook&role=eq.personal&select=id,label,provider,role,apply_enabled&limit=3`,
         { headers },
       );
       if (!response.ok) {

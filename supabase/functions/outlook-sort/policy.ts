@@ -20,6 +20,10 @@ type Rule = {
   include_subject?: string;
 };
 
+// Keep actionable account, payment, and delivery notices visible even after
+// they have been read. Sender/domain filing rules must not override this.
+const protectedSubject = /(?:password|passcode|verification code|one[- ]time|security (?:alert|code|notice)|sign[- ]?in|signed in|log[- ]?in|was this you|new app(?:s|\(s\))? connected|oauth application approval|app(?:lication)? (?:approval|access granted)|account (?:access|recovery|change|verification)|payment (?:update|due|failed|processed|receipt)|bill(?: is| due)|invoice|statement (?:is|available)|order (?:confirmation|update|receipt)|shipping (?:update|notice)|delivered:)/i;
+
 export function chicagoSlot(now: Date) {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: "America/Chicago",
@@ -67,6 +71,19 @@ export function classifyInbox(messages: MailMessage[], rules: Rules) {
   return summary;
 }
 
+// Manual preview only. The caller receives metadata; the database still stores counts.
+export function previewMoves(messages: MailMessage[], rules: Rules) {
+  return messages.flatMap((message) => {
+    const decision = classifyOne(message, rules);
+    if (!decision.startsWith("file:")) return [];
+    return [{
+      from: message.from?.emailAddress?.address ?? "",
+      subject: message.subject ?? "",
+      folder: decision.slice(5),
+    }];
+  });
+}
+
 function classifyOne(message: MailMessage, rules: Rules) {
   const subject = message.subject ?? "";
   const email = message.from?.emailAddress?.address?.toLowerCase() ?? "";
@@ -76,6 +93,9 @@ function classifyOne(message: MailMessage, rules: Rules) {
   }
   if (rules.skip_flagged !== false && message.flag?.flagStatus === "flagged") {
     return "flagged";
+  }
+  if (protectedSubject.test(subject)) {
+    return "review";
   }
   if (subject.toLowerCase().startsWith("inbox digest")) {
     return "review";

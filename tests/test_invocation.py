@@ -47,6 +47,34 @@ if (scheduled.body?.reason !== "outside schedule") {
   throw new Error("off-window schedule was not skipped");
 }
 const { runStatus } = await import("./supabase/functions/outlook-sort/auth.ts");
+const { classifyInbox, previewMoves } = await import("./supabase/functions/outlook-sort/policy.ts");
+const rules = { auto_file: [{ match: "domain", value: "offers.example", folder: "Promotions" }] };
+const messages = [
+  { subject: "Sale", from: { emailAddress: { address: "news@offers.example" } }, isRead: true, body: { secret: "do not return" } },
+  { subject: "Unread sale", from: { emailAddress: { address: "news@offers.example" } }, isRead: false },
+  { subject: "Flagged sale", from: { emailAddress: { address: "news@offers.example" } }, isRead: true, flag: { flagStatus: "flagged" } },
+  { subject: "Personal", from: { emailAddress: { address: "friend@example.org" } }, isRead: true },
+];
+const summary = classifyInbox(messages, rules);
+const preview = previewMoves(messages, rules);
+if (summary.would_file !== 1 || preview.length !== summary.would_file || preview[0].folder !== "Promotions" || JSON.stringify(preview).includes("do not return")) {
+  throw new Error("preview differed from the dry-run decision or leaked message body");
+}
+const sensitiveRules = { auto_file: [
+  { match: "domain_suffix", value: "microsoft.com", folder: "Tech", bypass_safety: true },
+  { match: "domain_suffix", value: "whoop.com", folder: "Security", bypass_safety: true },
+  { match: "domain_suffix", value: "att-mail.com", folder: "Finance", bypass_safety: true },
+] };
+const sensitive = [
+  { subject: "New app(s) connected to your Microsoft account", from: { emailAddress: { address: "account-security-noreply@accountprotection.microsoft.com" } }, isRead: true },
+  { subject: "New Sign-In Alert & Was This You?", from: { emailAddress: { address: "support@whoop.com" } }, isRead: true },
+  { subject: "Here's your payment update", from: { emailAddress: { address: "update@account.att-mail.com" } }, isRead: true },
+  { subject: "OAuth Application Approval", from: { emailAddress: { address: "noreply@microsoft.com" } }, isRead: true },
+  { subject: "Weekly product news", from: { emailAddress: { address: "news@microsoft.com" } }, isRead: true },
+];
+if (classifyInbox(sensitive, sensitiveRules).would_file !== 1 || previewMoves(sensitive, sensitiveRules).length !== 1) {
+  throw new Error("account and billing notices were filed by broad domain rules");
+}
 const stored = { complete: true, stored: true, error: null };
 if (runStatus([stored, stored, { complete: true, stored: false, error: "result write failed" }]) === "dry_run_complete") {
   throw new Error("unstored result was treated as complete");
