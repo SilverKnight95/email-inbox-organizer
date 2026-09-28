@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
-const source = readFileSync(new URL("../supabase/functions/outlook-sort/index.ts", import.meta.url), "utf8");
+const source = readFileSync(new URL("../supabase/functions/outlook-sort/handler.ts", import.meta.url), "utf8");
 const start = source.indexOf("async function resolveDestinationFolders(");
 const end = source.indexOf("\nasync function getMessage(", start);
 const { stripTypeScriptTypes } = await import("node:module");

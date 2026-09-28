@@ -1,0 +1,8 @@
+{
+  "compilerOptions": {
+    "target": "ES2022", "module": "ESNext", "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true, "resolveJsonModule": true, "noEmit": true,
+    "strict": true, "lib": ["ES2022", "DOM"]
+  },
+  "include": ["supabase/functions/outlook-sort/**/*.ts", "tests/deno.d.ts"]
+}

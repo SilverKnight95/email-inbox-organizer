@@ -99,6 +99,8 @@ function classifyOne(message: MailMessage, rules: Rules) {
   // Missing read state is uncertain; preserve it for review.
   if (message.isRead !== true) return "review";
   if (rules.skip_flagged !== false && message.flag?.flagStatus === "flagged") return "flagged";
+  // Only an explicit unflagged state is eligible; completed/unknown flags stay visible.
+  if (message.flag?.flagStatus !== "notFlagged") return "review";
   if (protectedSubject.test(subject)) return "review";
   if (subject.toLowerCase().startsWith("inbox digest")) return "review";
   const safetyHold = rules.global_exclude_subject

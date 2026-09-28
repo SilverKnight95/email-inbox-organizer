@@ -11,3 +11,5 @@ delete-review.json
 delete-report.json
 __pycache__/
 *.pyc
+node_modules/
+supabase/.temp/
