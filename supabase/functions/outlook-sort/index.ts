@@ -485,7 +485,7 @@ async function resolveDestinationFolders(accessToken: string, names: string[]) {
       if (!wanted.has(key)) continue;
       if (PROTECTED_DESTINATIONS.has(key)) throw new Error("protected destination");
       if (result.has(key)) throw new Error("ambiguous destination folder");
-      if (folder.parentFolderId != null && folder.parentFolderId !== "") throw new Error("destination folder must be top-level");
+      // /me/mailFolders returns root children; their parentFolderId is the mailbox root.
       if (typeof folder.id !== "string") throw new Error("destination folder id missing");
       result.set(key, folder.id);
     }
