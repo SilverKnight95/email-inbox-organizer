@@ -1,4 +1,6 @@
 export type MailMessage = {
+  id?: string;
+  parentFolderId?: string;
   subject?: string;
   isRead?: boolean;
   flag?: { flagStatus?: string };
@@ -37,9 +39,7 @@ export function chicagoSlot(now: Date) {
   const get = (type: string) => parts.find((part) => part.type === type)?.value ?? "";
   const weekday = get("weekday");
   const hour = Number(get("hour"));
-  if (!["Mon", "Thu"].includes(weekday) || hour !== 8) {
-    return null;
-  }
+  if (!["Mon", "Thu"].includes(weekday) || hour !== 8) return null;
   return `${get("year")}-${get("month")}-${get("day")}T08`;
 }
 
@@ -71,12 +71,15 @@ export function classifyInbox(messages: MailMessage[], rules: Rules) {
   return summary;
 }
 
-// Manual preview only. The caller receives metadata; the database still stores counts.
+// Preview returns no Graph IDs or message bodies. The ID is retained only in
+// memory so the server can bind manual apply to this exact candidate batch.
 export function previewMoves(messages: MailMessage[], rules: Rules) {
   return messages.flatMap((message) => {
+    if (typeof message.id !== "string" || message.isRead !== true) return [];
     const decision = classifyOne(message, rules);
     if (!decision.startsWith("file:")) return [];
     return [{
+      messageId: message.id,
       from: message.from?.emailAddress?.address ?? "",
       subject: message.subject ?? "",
       folder: decision.slice(5),
@@ -84,35 +87,27 @@ export function previewMoves(messages: MailMessage[], rules: Rules) {
   });
 }
 
+export function fileDecision(message: MailMessage, rules: Rules) {
+  return classifyOne(message, rules);
+}
+
 function classifyOne(message: MailMessage, rules: Rules) {
   const subject = message.subject ?? "";
   const email = message.from?.emailAddress?.address?.toLowerCase() ?? "";
   const domain = email.includes("@") ? email.split("@")[1] : email;
-  if (rules.never_move_unread !== false && message.isRead === false) {
-    return "unread";
-  }
-  if (rules.skip_flagged !== false && message.flag?.flagStatus === "flagged") {
-    return "flagged";
-  }
-  if (protectedSubject.test(subject)) {
-    return "review";
-  }
-  if (subject.toLowerCase().startsWith("inbox digest")) {
-    return "review";
-  }
+  if (rules.never_move_unread !== false && message.isRead === false) return "unread";
+  // Missing read state is uncertain; preserve it for review.
+  if (message.isRead !== true) return "review";
+  if (rules.skip_flagged !== false && message.flag?.flagStatus === "flagged") return "flagged";
+  if (protectedSubject.test(subject)) return "review";
+  if (subject.toLowerCase().startsWith("inbox digest")) return "review";
   const safetyHold = rules.global_exclude_subject
     ? new RegExp(rules.global_exclude_subject, "i").test(subject)
     : false;
   for (const rule of rules.auto_file ?? []) {
-    if (!matches(rule, email, domain, subject)) {
-      continue;
-    }
-    if (rule.include_subject && !new RegExp(rule.include_subject, "i").test(subject)) {
-      continue;
-    }
-    if (safetyHold && !rule.bypass_safety) {
-      continue;
-    }
+    if (!matches(rule, email, domain, subject)) continue;
+    if (rule.include_subject && !new RegExp(rule.include_subject, "i").test(subject)) continue;
+    if (safetyHold && !rule.bypass_safety) continue;
     return `file:${rule.folder}`;
   }
   return "review";
@@ -120,17 +115,9 @@ function classifyOne(message: MailMessage, rules: Rules) {
 
 function matches(rule: Rule, email: string, domain: string, subject: string) {
   const value = rule.value.toLowerCase();
-  if (rule.match === "sender") {
-    return email === value;
-  }
-  if (rule.match === "domain") {
-    return domain === value;
-  }
-  if (rule.match === "domain_suffix") {
-    return domain === value || domain.endsWith(`.${value}`);
-  }
-  if (rule.match === "subject") {
-    return new RegExp(rule.value, "i").test(subject);
-  }
+  if (rule.match === "sender") return email === value;
+  if (rule.match === "domain") return domain === value;
+  if (rule.match === "domain_suffix") return domain === value || domain.endsWith(`.${value}`);
+  if (rule.match === "subject") return new RegExp(rule.value, "i").test(subject);
   return false;
 }

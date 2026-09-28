@@ -35,8 +35,11 @@ try {
 } catch (error) {
   filing = { status: 500 };
 }
-if (filing.status !== 403) {
-  throw new Error("manual call enabled filing");
+if (filing.status !== 200 || filing.apply !== true || filing.slot !== "manual:review001") {
+  throw new Error("explicit manual apply was not isolated");
+}
+if (resolveSlot({ apply: true }, new Date("2026-09-28T12:00:00Z")).status !== 403) {
+  throw new Error("scheduled apply was not rejected");
 }
 const manual = resolveSlot({ manual: true, run_key: "review001", apply: false }, new Date("2026-09-28T12:00:00Z"));
 if (manual.slot !== "manual:review001" || manual.apply !== false) {
@@ -50,7 +53,7 @@ const { runStatus } = await import("./supabase/functions/outlook-sort/auth.ts");
 const { classifyInbox, previewMoves } = await import("./supabase/functions/outlook-sort/policy.ts");
 const rules = { auto_file: [{ match: "domain", value: "offers.example", folder: "Promotions" }] };
 const messages = [
-  { subject: "Sale", from: { emailAddress: { address: "news@offers.example" } }, isRead: true, body: { secret: "do not return" } },
+  { id: "sale-1", subject: "Sale", from: { emailAddress: { address: "news@offers.example" } }, isRead: true, body: { secret: "do not return" } },
   { subject: "Unread sale", from: { emailAddress: { address: "news@offers.example" } }, isRead: false },
   { subject: "Flagged sale", from: { emailAddress: { address: "news@offers.example" } }, isRead: true, flag: { flagStatus: "flagged" } },
   { subject: "Personal", from: { emailAddress: { address: "friend@example.org" } }, isRead: true },
@@ -70,7 +73,7 @@ const sensitive = [
   { subject: "New Sign-In Alert & Was This You?", from: { emailAddress: { address: "support@whoop.com" } }, isRead: true },
   { subject: "Here's your payment update", from: { emailAddress: { address: "update@account.att-mail.com" } }, isRead: true },
   { subject: "OAuth Application Approval", from: { emailAddress: { address: "noreply@microsoft.com" } }, isRead: true },
-  { subject: "Weekly product news", from: { emailAddress: { address: "news@microsoft.com" } }, isRead: true },
+  { id: "weekly-news", subject: "Weekly product news", from: { emailAddress: { address: "news@microsoft.com" } }, isRead: true },
 ];
 if (classifyInbox(sensitive, sensitiveRules).would_file !== 1 || previewMoves(sensitive, sensitiveRules).length !== 1) {
   throw new Error("account and billing notices were filed by broad domain rules");
