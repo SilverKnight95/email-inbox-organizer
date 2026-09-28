@@ -257,8 +257,15 @@ async function applyOneAccount({ body, slot, runId, account, supabase }: {
   let moved = 0;
   let skipped = 0;
   let failed = 0;
+  let revoked = false;
   const movedByFolder: Record<string, number> = {};
   for (const candidate of batch) {
+    // Re-read the account gate before every move so revocation stops in-flight filing.
+    if (revoked || !(await supabase.applyEnabled(account.id).catch(() => false))) {
+      revoked = true;
+      skipped++;
+      continue;
+    }
     try {
       const current = await getMessage(scan.accessToken, candidate.messageId);
       const currentFrom = current.from?.emailAddress?.address ?? "";
@@ -273,7 +280,7 @@ async function applyOneAccount({ body, slot, runId, account, supabase }: {
         skipped++;
         continue;
       }
-      const folderId = folderIds.get(candidate.folder.toLowerCase());
+      const folderId = folderIds.get(candidate.folder);
       if (!folderId) {
         failed++;
         continue;
@@ -286,7 +293,12 @@ async function applyOneAccount({ body, slot, runId, account, supabase }: {
     }
   }
   const complete = moved === batch.length && skipped === 0 && failed === 0;
-  const error = complete ? null : "some reviewed messages changed or could not be filed";
+  const error = complete
+    ? null
+    : revoked
+        ? "manual filing was disabled during the run; remaining messages were not moved"
+        : "some reviewed messages changed or could not be filed";
+  // Mail may already have moved; a thrown write must not skip the terminal status update.
   const stored = await supabase.saveResult(runId, account.id, {
     ...summary,
     by_folder: movedByFolder,
@@ -296,10 +308,14 @@ async function applyOneAccount({ body, slot, runId, account, supabase }: {
     complete,
     error,
     details: { attempted: batch.length, moved, skipped, failed, deferred: candidates.length - batch.length },
-  });
+  }).catch(() => false);
   // Never report a run that moved mail as "failed"; the moves already happened.
   const status = complete && stored ? "apply_complete" : moved > 0 ? "apply_partial" : "failed";
-  const finished = await supabase.finish(runId, status);
+  const finished = await supabase.finish(runId, status).catch(() => false);
+  if (!stored || !finished) {
+    // Counts only; the response below carries the in-memory counts for manual reconciliation.
+    console.error(JSON.stringify({ event: "apply_record_failed", run_id: runId, status, stored, finished, moved, skipped, failed }));
+  }
   const result = {
     account_label: account.label,
     complete: complete && stored && finished,
@@ -311,7 +327,7 @@ async function applyOneAccount({ body, slot, runId, account, supabase }: {
     skipped,
     failed,
     deferred: candidates.length - batch.length,
-    error: stored ? error : "result write failed",
+    error: !stored ? "result write failed" : !finished ? "run status was not saved" : error,
   };
   return json({ action: status, slot, preview_run_key: body.preview_run_key, apply: true, results: [result] }, complete && stored && finished ? 200 : 207);
 }
@@ -377,6 +393,15 @@ function supabaseClient() {
         : null;
       if (typeof previewHash !== "string") return null;
       return { runId: runs[0].id, preview_hash: previewHash };
+    },
+    async applyEnabled(accountId: string) {
+      const response = await fetch(
+        `${url}/rest/v1/organizer_accounts?id=eq.${encodeURIComponent(accountId)}&select=enabled,apply_enabled&limit=1`,
+        { headers },
+      );
+      if (!response.ok) return false;
+      const rows = await response.json();
+      return Array.isArray(rows) && rows[0]?.enabled === true && rows[0]?.apply_enabled === true;
     },
     async token(accountId: string) {
       const response = await fetch(`${url}/rest/v1/rpc/organizer_refresh_token`, {
@@ -474,22 +499,30 @@ async function listInbox(accessToken: string) {
 }
 
 async function resolveDestinationFolders(accessToken: string, names: string[]) {
-  const wanted = new Set(names.map((name) => name.trim().toLowerCase()));
-  for (const key of wanted) if (PROTECTED_DESTINATIONS.has(key)) throw new Error("protected destination");
+  // Match the configured display name exactly; no trimming or case folding.
+  const wanted = new Set(names);
+  for (const name of wanted) {
+    if (PROTECTED_DESTINATIONS.has(name.trim().toLowerCase())) throw new Error("protected destination");
+  }
+  const wantedFolded = new Set([...wanted].map((name) => name.trim().toLowerCase()));
   const result = new Map<string, string>();
+  const seenFolded = new Set<string>();
   let next: string | null = `${GRAPH}/me/mailFolders?$top=100&$select=id,displayName,parentFolderId`;
   while (next) {
     const response = await graphFetch(accessToken, next);
     const page = await response.json();
     for (const folder of page.value ?? []) {
-      const name = String(folder.displayName ?? "").trim();
-      const key = name.toLowerCase();
-      if (!wanted.has(key)) continue;
-      if (PROTECTED_DESTINATIONS.has(key)) throw new Error("protected destination");
-      if (result.has(key)) throw new Error("ambiguous destination folder");
+      const name = String(folder.displayName ?? "");
+      const folded = name.trim().toLowerCase();
+      if (!wantedFolded.has(folded)) continue;
+      if (PROTECTED_DESTINATIONS.has(folded)) throw new Error("protected destination");
+      // Near-duplicates (case or spacing variants) make the destination ambiguous.
+      if (seenFolded.has(folded)) throw new Error("ambiguous destination folder");
+      seenFolded.add(folded);
+      if (!wanted.has(name)) continue;
       // /me/mailFolders returns root children; their parentFolderId is the mailbox root.
       if (typeof folder.id !== "string") throw new Error("destination folder id missing");
-      result.set(key, folder.id);
+      result.set(name, folder.id);
     }
     next = page["@odata.nextLink"] ?? null;
   }
@@ -512,6 +545,8 @@ async function moveMessage(accessToken: string, messageId: string, destinationId
 }
 
 async function graphFetch(accessToken: string, url: string) {
+  // Never send the mailbox token off-host, including via @odata.nextLink.
+  if (!url.startsWith(`${GRAPH}/`)) throw new Error("unexpected Graph URL");
   const response = await fetch(url, { headers: { authorization: `Bearer ${accessToken}`, prefer: 'IdType="ImmutableId"' } });
   if (!response.ok) throw new Error("mailbox request failed");
   return response;

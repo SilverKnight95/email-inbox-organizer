@@ -23,13 +23,16 @@ async function resolve(pages, names) {
   return resolver("synthetic-token", names);
 }
 const rootChild = { id: "promotions-id", displayName: "Promotions", parentFolderId: "mailbox-root-id" };
-assert.equal((await resolve([{ value: [rootChild] }], ["Promotions"])).get("promotions"), "promotions-id");
+assert.equal((await resolve([{ value: [rootChild] }], ["Promotions"])).get("Promotions"), "promotions-id");
 await assert.rejects(resolve([{ value: [] }], ["Promotions"]), /missing/);
+await assert.rejects(resolve([{ value: [{ ...rootChild, displayName: " Promotions " }] }], ["Promotions"]), /missing/);
+await assert.rejects(resolve([{ value: [{ ...rootChild, displayName: "promotions" }] }], ["Promotions"]), /missing/);
+await assert.rejects(resolve([{ value: [rootChild, { ...rootChild, id: "variant-id", displayName: "promotions" }] }], ["Promotions"]), /ambiguous/);
 await assert.rejects(resolve([{ value: [rootChild, { ...rootChild, id: "duplicate-id" }] }], ["Promotions"]), /ambiguous/);
 await assert.rejects(resolve([{ value: [{ id: "deleted-id", displayName: "Deleted Items", parentFolderId: "root-id" }] }], ["Deleted Items"]), /protected/);
 const paged = await resolve([
   { value: [], "@odata.nextLink": GRAPH + "/me/mailFolders?$skiptoken=synthetic" },
   { value: [rootChild] },
 ], ["Promotions"]);
-assert.equal(paged.get("promotions"), "promotions-id");
+assert.equal(paged.get("Promotions"), "promotions-id");
 console.log("folder resolver: root parent, missing, duplicate, protected, pagination passed");
