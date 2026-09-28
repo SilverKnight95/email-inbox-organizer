@@ -20,6 +20,7 @@ Set these in Supabase, not in git:
 - `AZURE_CLIENT_SECRET`
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
+- `ORGANIZER_INVOKE_SECRET`
 
 The Azure app is a confidential client. Redirect URI: `http://127.0.0.1:8787/callback`. Scopes: `offline_access`, `User.Read`, and `Mail.ReadWrite`. Tenant: `consumers`.
 
@@ -29,7 +30,7 @@ The Azure app is a confidential client. Redirect URI: `http://127.0.0.1:8787/cal
 supabase functions deploy outlook-sort --no-verify-jwt
 ```
 
-Do not invoke it with `{"apply": true}`. The function rejects that.
+`--no-verify-jwt` is required because the scheduler sends a shared secret, not a Supabase user JWT. The function itself rejects any request that does not have `Authorization: Bearer $ORGANIZER_INVOKE_SECRET`. Set that secret with the other function secrets. Do not invoke the function with `{"apply": true}`.
 
 ## 4. Authorize each account
 
@@ -41,36 +42,30 @@ python3 scripts/outlook_authorize.py \
   --client-id "$AZURE_CLIENT_ID"
 ```
 
-Open the printed URL and sign in to that personal Outlook account. Microsoft redirects to the callback. Then:
+Open the printed URL and sign in to that personal Outlook account. Copy the redirect URL from the browser. Do not save it in this repo. Then, with `AZURE_CLIENT_SECRET`, `SUPABASE_URL`, and `SUPABASE_SERVICE_ROLE_KEY` set in the environment:
 
 ```bash
 python3 scripts/outlook_authorize.py \
+  --complete \
   --label personal-outlook-1 \
   --client-id "$AZURE_CLIENT_ID" \
-  --callback-url "http://127.0.0.1:8787/callback?code=CODE&state=STATE"
+  --callback-url "$CALLBACK_URL"
 ```
 
-The script checks `state` and refuses a mismatch. Exchange the code with `exchange_code` from `graph_auth.py`. Store the refresh token with Vault, not in a file in this repo:
-
-```sql
-select organizer_store_refresh_token(
-  (select id from organizer_accounts where label = 'personal-outlook-1'),
-  'PASTE_REFRESH_TOKEN'
-);
-update organizer_accounts
-  set enabled = true
-  where label = 'personal-outlook-1';
-```
-
-Leave `apply_enabled` false. Delete any local copy of the token after the Vault write. If Microsoft later returns a replacement refresh token, the function saves it with `organizer_store_refresh_token` before that account can succeed.
+The script checks `state`, exchanges the code, and stores the refresh token through `organizer_store_refresh_token_by_label`. It enables that personal account and leaves `apply_enabled` false. Success prints only `{"label":"personal-outlook-1","stored":true,"apply_enabled":false}`. It does not print the token.
 
 ## 5. Review a dry run
 
-Call the function once, outside the schedule, only after the three tokens are stored:
+Call the function once, outside the schedule, only after the three tokens are stored. Use a unique manual run key. This path does not require the Chicago 8:00 a.m. window and cannot enable filing:
 
-```json
-{"apply": false}
+```bash
+curl -sS -X POST "$SUPABASE_URL/functions/v1/outlook-sort" \
+  -H "Authorization: Bearer $ORGANIZER_INVOKE_SECRET" \
+  -H "Content-Type: application/json" \
+  -d '{"manual": true, "apply": false, "run_key": "review001"}'
 ```
+
+The run key is stored as `manual:review001`. A second call with the same key is rejected. `{"apply": true}` is rejected even on this path.
 
 A complete run has status `dry_run_complete` and one result per account with `complete = true` and `filed = 0`. `incomplete` means a mailbox was not fully scanned. `failed` means a token, rotation save, or database write failed. Results are counts only.
 

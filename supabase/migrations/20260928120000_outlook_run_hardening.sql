@@ -40,3 +40,31 @@ $$;
 
 revoke all on function organizer_store_refresh_token(uuid, text) from public, anon, authenticated;
 grant execute on function organizer_store_refresh_token(uuid, text) to service_role;
+
+create or replace function organizer_store_refresh_token_by_label(account_label text, token text)
+returns void
+language plpgsql
+security definer
+set search_path = public, vault
+as $$
+declare
+  account_id uuid;
+begin
+  if account_label not in ('personal-outlook-1', 'personal-outlook-2', 'personal-outlook-3') then
+    raise exception 'account not allowed';
+  end if;
+  select id into account_id
+  from organizer_accounts
+  where label = account_label and provider = 'outlook' and role = 'personal';
+  if account_id is null then
+    raise exception 'account not found';
+  end if;
+  perform organizer_store_refresh_token(account_id, token);
+  update organizer_accounts
+    set enabled = true
+    where id = account_id and apply_enabled = false;
+end;
+$$;
+
+revoke all on function organizer_store_refresh_token_by_label(text, text) from public, anon, authenticated;
+grant execute on function organizer_store_refresh_token_by_label(text, text) to service_role;

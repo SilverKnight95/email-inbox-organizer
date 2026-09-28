@@ -1,7 +1,8 @@
 // Dry-run only. Does not unsubscribe, send, trash, or move mail.
 // Gmail is not handled. A school mailbox must not be stored.
 
-import { classifyInbox, chicagoSlot } from "./policy.ts";
+import { invocationAllowed, resolveSlot } from "./auth.ts";
+import { classifyInbox } from "./policy.ts";
 import rules from "./rules.json" with { type: "json" };
 
 const GRAPH = "https://graph.microsoft.com/v1.0";
@@ -11,16 +12,23 @@ Deno.serve(async (request) => {
   if (request.method !== "POST") {
     return json({ error: "POST only" }, 405);
   }
+  if (!invocationAllowed(request.headers.get("authorization"), Deno.env.get("ORGANIZER_INVOKE_SECRET"))) {
+    return json({ error: "unauthorized" }, 401);
+  }
   const body = await request.json().catch(() => ({}));
-  if (body.apply === true) {
-    return json({ error: "live filing is disabled until a dry run has been reviewed" }, 403);
+  let resolved
+  try {
+    resolved = resolveSlot(body, new Date());
+  } catch {
+    return json({ error: "invalid manual run key" }, 400);
   }
-
-  const now = new Date();
-  const slot = chicagoSlot(now);
-  if (!slot) {
-    return json({ action: "skip", reason: "outside schedule" });
+  if (resolved.status === 403) {
+    return json(resolved.body, 403);
   }
+  if (!resolved.slot) {
+    return json(resolved.body, resolved.status);
+  }
+  const slot = resolved.slot;
 
   const supabase = supabaseClient();
   const claimed = await supabase.rpcClaim(slot);

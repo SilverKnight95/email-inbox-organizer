@@ -4,7 +4,8 @@
 -- The request body keeps apply false. Do not turn filing on here.
 --
 -- Run this only after the edge function is deployed. Replace the URL and
--- store the bearer in Vault, not in this file.
+-- store ORGANIZER_INVOKE_SECRET in Vault as outlook_sort_bearer, not in this file.
+-- Scheduled calls use the same bearer as manual calls. The body must stay apply false.
 
 -- select vault.create_secret('https://PROJECT.supabase.co/functions/v1/outlook-sort', 'outlook_sort_url');
 -- select vault.create_secret('FUNCTION_BEARER', 'outlook_sort_bearer');
