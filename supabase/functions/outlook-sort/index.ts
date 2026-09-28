@@ -1,7 +1,7 @@
 // Dry-run only. Does not unsubscribe, send, trash, or move mail.
 // Gmail is not handled. A school mailbox must not be stored.
 
-import { invocationAllowed, resolveSlot } from "./auth.ts";
+import { invocationAllowed, resolveSlot, runStatus } from "./auth.ts";
 import { classifyInbox } from "./policy.ts";
 import rules from "./rules.json" with { type: "json" };
 
@@ -43,10 +43,14 @@ Deno.serve(async (request) => {
     await supabase.finish(claimed, "failed");
     return json({ action: "failed", slot, error: "account list was not read" }, 500);
   }
+  if (accounts.length !== 3) {
+    await supabase.finish(claimed, "failed");
+    return json({ action: "failed", slot, error: "expected three personal Outlook accounts" }, 500);
+  }
   const results = [];
   for (const account of accounts) {
     if (account.provider !== "outlook" || account.role !== "personal" || account.apply_enabled) {
-      results.push({ account_id: account.id, error: "account is not an eligible personal Outlook dry run" });
+      results.push({ account_id: account.id, complete: false, stored: false, error: "account is not an eligible personal Outlook dry run" });
       continue;
     }
     try {
@@ -61,12 +65,22 @@ Deno.serve(async (request) => {
       if (!scan.complete) {
         summary.error = "partial scan";
       }
-      await supabase.saveResult(claimed, account.id, summary, summary.error);
-      results.push({ account_id: account.id, complete: scan.complete, error: summary.error ?? null });
+      const saved = await supabase.saveResult(claimed, account.id, summary, summary.error);
+      results.push({
+        account_id: account.id,
+        complete: saved ? scan.complete : false,
+        stored: saved,
+        error: saved ? (summary.error ?? null) : "result write failed",
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : "account run failed";
       const saved = await supabase.saveResult(claimed, account.id, emptySummary(), message);
-      results.push({ account_id: account.id, complete: false, error: saved ? message : "result write failed" });
+      results.push({
+        account_id: account.id,
+        complete: false,
+        stored: saved,
+        error: saved ? message : "result write failed",
+      });
     }
   }
   const status = runStatus(results);
@@ -76,16 +90,6 @@ Deno.serve(async (request) => {
   }
   return json({ action: status, slot, apply: false, results }, status === "dry_run_complete" ? 200 : 500);
 });
-
-function runStatus(results: Array<{ complete?: boolean; error?: string | null }>) {
-  if (!results.length || results.some((result) => result.error && result.error !== "partial scan")) {
-    return "failed";
-  }
-  if (results.some((result) => result.complete === false)) {
-    return "incomplete";
-  }
-  return "dry_run_complete";
-}
 
 function emptySummary() {
   return {

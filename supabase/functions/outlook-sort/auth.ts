@@ -22,6 +22,19 @@ export function manualSlot(runKey: string) {
   return `manual:${runKey}`;
 }
 
+export function runStatus(results: Array<{ complete?: boolean; error?: string | null; stored?: boolean }>) {
+  if (results.length !== 3 || results.some((result) => result.stored !== true)) {
+    return "failed";
+  }
+  if (results.some((result) => result.error && result.error !== "partial scan")) {
+    return "failed";
+  }
+  if (results.some((result) => result.complete !== true)) {
+    return "incomplete";
+  }
+  return "dry_run_complete";
+}
+
 export function resolveSlot(body: { manual?: boolean; run_key?: string; apply?: boolean }, now: Date) {
   if (body.apply === true) {
     return { status: 403, body: { error: "live filing is disabled until a dry run has been reviewed" } };

@@ -152,19 +152,17 @@ def test_next_link_pagination_and_incomplete_scan():
     assert incomplete is True
 
 
+def stored_result():
+    return {"complete": True, "stored": True, "error": None}
+
+
 def test_failed_writes_and_partial_scans_are_visible():
-    assert finalize_run(
-        [{"complete": True, "error": None}],
-        [{"ok": True, "op": "save"}],
-    ) == "dry_run_complete"
-    assert finalize_run(
-        [{"complete": False, "error": "partial scan"}],
-        [{"ok": True, "op": "save"}],
-    ) == "incomplete"
-    assert finalize_run(
-        [{"complete": False, "error": "token rotation was not saved"}],
-        [{"ok": False, "op": "store_token"}],
-    ) == "failed"
+    assert finalize_run([stored_result(), stored_result(), stored_result()]) == "dry_run_complete"
+    partial = [stored_result(), stored_result(), {"complete": False, "stored": True, "error": "partial scan"}]
+    assert finalize_run(partial) == "incomplete"
+    unstored = [stored_result(), stored_result(), {"complete": True, "stored": False, "error": "result write failed"}]
+    assert finalize_run(unstored) == "failed"
+    assert finalize_run([stored_result(), stored_result()]) == "failed"
     assert finalize_run([], [{"ok": False, "op": "claim"}]) == "failed"
 
 

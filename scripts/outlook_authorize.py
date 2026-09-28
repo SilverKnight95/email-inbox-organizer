@@ -63,8 +63,32 @@ def main():
             with urllib.request.urlopen(req, timeout=30) as resp:
                 return json.load(resp)
 
-        def store(label, token):
-            body = json.dumps({"account_label": label, "token": token}).encode()
+        def graph_id(access_token):
+            req = urllib.request.Request(
+                "https://graph.microsoft.com/v1.0/me?$select=id",
+                headers={"authorization": f"Bearer {access_token}"},
+            )
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                return json.load(resp)["id"]
+
+        def expected_key(label):
+            body = json.dumps({"account_label": label}).encode()
+            req = urllib.request.Request(
+                f"{supabase_url}/rest/v1/rpc/organizer_expected_account_key",
+                data=body,
+                method="POST",
+                headers={
+                    "apikey": service_key,
+                    "authorization": f"Bearer {service_key}",
+                    "content-type": "application/json",
+                },
+            )
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                value = json.load(resp)
+            return value or ""
+
+        def store(label, token, key):
+            body = json.dumps({"account_label": label, "token": token, "account_key": key}).encode()
             req = urllib.request.Request(
                 f"{supabase_url}/rest/v1/rpc/organizer_store_refresh_token_by_label",
                 data=body,
@@ -89,6 +113,8 @@ def main():
             post,
             store,
             parse_callback,
+            graph_id,
+            expected_key(args.label),
         )
         state_path.unlink(missing_ok=True)
         print(json.dumps(result))
