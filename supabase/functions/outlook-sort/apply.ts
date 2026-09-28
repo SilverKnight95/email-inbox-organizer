@@ -13,8 +13,10 @@ export function manualBatch(moves: MoveCandidate[]) {
     .slice(0, MAX_MANUAL_MOVES);
 }
 
-// The digest is an opaque confirmation for the exact first batch. Message IDs
-// stay server-side; only the digest and sender/subject/folder preview are sent.
+// The digest is an opaque confirmation for the exact first batch only; deferred
+// candidates beyond MAX_MANUAL_MOVES are intentionally excluded so new mail
+// outside the batch does not invalidate a reviewed preview. Message IDs stay
+// server-side; only the digest and sender/subject/folder preview are sent.
 export async function previewDigest(accountLabel: string, moves: MoveCandidate[]) {
   const ordered = manualBatch(moves).map(({ messageId, from, subject, folder }) => ({ messageId, from, subject, folder }));
   const bytes = new TextEncoder().encode(JSON.stringify({ accountLabel, moves: ordered }));

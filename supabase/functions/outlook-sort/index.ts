@@ -122,7 +122,13 @@ Deno.serve(async (request) => {
   const status = runStatus(results);
   const finished = await supabase.finish(claimed, status);
   if (!finished) return json({ action: "failed", slot, error: "run status was not saved", results }, 500);
-  return json({ action: status, slot, apply: false, results }, status === "dry_run_complete" ? 200 : 500);
+  return json({
+    action: status,
+    slot,
+    apply: false,
+    ...(body.preview === true ? { preview_run_key: body.run_key } : {}),
+    results,
+  }, status === "dry_run_complete" ? 200 : 500);
 });
 
 type OrganizerAccount = {
