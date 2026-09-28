@@ -8,6 +8,7 @@ import argparse
 import json
 import secrets
 import sys
+import tempfile
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
@@ -37,12 +38,12 @@ def main():
     parser = argparse.ArgumentParser(description="Authorize one personal Outlook account")
     parser.add_argument("--label", required=True, choices=LABELS)
     parser.add_argument("--client-id", required=True)
-    parser.add_argument("--redirect-uri", default="http://127.0.0.1:8787/callback")
+    parser.add_argument("--redirect-uri", default="http://localhost:8787/callback")
     parser.add_argument("--callback-url")
     parser.add_argument("--state-file", default="")
     parser.add_argument("--complete", action="store_true")
     args = parser.parse_args()
-    state_path = Path(args.state_file) if args.state_file else Path(f"/tmp/outlook-auth-{args.label}.state")
+    state_path = Path(args.state_file) if args.state_file else Path(tempfile.gettempdir()) / f"outlook-auth-{args.label}.state"
     if args.complete:
         import os
         import urllib.parse
