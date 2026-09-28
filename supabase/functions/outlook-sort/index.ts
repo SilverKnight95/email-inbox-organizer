@@ -10,7 +10,7 @@ import rules from "./rules.json" with { type: "json" };
 const GRAPH = "https://graph.microsoft.com/v1.0";
 const TOKEN_URL = "https://login.microsoftonline.com/consumers/oauth2/v2.0/token";
 const ACCOUNT_LABELS = new Set(["personal-outlook-1", "personal-outlook-2", "personal-outlook-3"]);
-const PROTECTED_DESTINATIONS = new Set(["inbox", "deleted items", "deleted", "trash", "junk email", "junk", "drafts", "sent items"]);
+const PROTECTED_DESTINATIONS = new Set(["inbox", "deleted items", "deleted", "trash", "junk email", "junk", "drafts", "sent items", "outbox"]);
 
 Deno.serve(async (request) => {
   if (request.method !== "POST") return json({ error: "POST only" }, 405);
@@ -168,7 +168,7 @@ async function applyOneAccount({ body, slot, runId, account, supabase }: {
   supabase: ReturnType<typeof supabaseClient>;
 }) {
   const summary = blankSummary();
-  const preview = await supabase.verifyPreview(body.preview_run_key!, account.id);
+  const preview = await supabase.verifyPreview(body.preview_run_key!, account.id).catch(() => null);
   if (!preview) {
     const error = "the referenced completed manual preview was not found for this account";
     const stored = await supabase.saveResult(runId, account.id, summary, {
@@ -214,7 +214,7 @@ async function applyOneAccount({ body, slot, runId, account, supabase }: {
       ? "partial scan; no messages moved"
       : batch.length === 0
           ? "no eligible messages in the reviewed batch"
-          : hash !== preview.preview_hash
+          : body.preview_hash !== preview.preview_hash
               ? "preview hash does not match the reviewed preview"
               : "preview changed; no messages moved";
     const stored = await supabase.saveResult(runId, account.id, summary, {
@@ -265,7 +265,7 @@ async function applyOneAccount({ body, slot, runId, account, supabase }: {
       if (
         current.parentFolderId !== scan.inboxId ||
         current.isRead !== true ||
-        current.subject !== candidate.subject ||
+        (current.subject ?? "") !== candidate.subject ||
         currentFrom.toLowerCase() !== candidate.from.toLowerCase() ||
         current.flag?.flagStatus === "flagged" ||
         fileDecision(current, rules) !== `file:${candidate.folder}`
@@ -297,7 +297,8 @@ async function applyOneAccount({ body, slot, runId, account, supabase }: {
     error,
     details: { attempted: batch.length, moved, skipped, failed, deferred: candidates.length - batch.length },
   });
-  const status = !stored ? "failed" : complete ? "apply_complete" : "apply_partial";
+  // Never report a run that moved mail as "failed"; the moves already happened.
+  const status = complete && stored ? "apply_complete" : moved > 0 ? "apply_partial" : "failed";
   const finished = await supabase.finish(runId, status);
   const result = {
     account_label: account.label,
@@ -473,7 +474,8 @@ async function listInbox(accessToken: string) {
 }
 
 async function resolveDestinationFolders(accessToken: string, names: string[]) {
-  const wanted = new Set(names.map((name) => name.toLowerCase()));
+  const wanted = new Set(names.map((name) => name.trim().toLowerCase()));
+  for (const key of wanted) if (PROTECTED_DESTINATIONS.has(key)) throw new Error("protected destination");
   const result = new Map<string, string>();
   let next: string | null = `${GRAPH}/me/mailFolders?$top=100&$select=id,displayName,parentFolderId`;
   while (next) {
