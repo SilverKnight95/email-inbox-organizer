@@ -39,3 +39,6 @@ assert.notEqual(await previewDigest("personal-outlook-1", oversized.map((item, i
   "changed preview metadata must invalidate confirmation");
 assert.notEqual(await previewDigest("personal-outlook-2", oversized), digest, "digest must be account-bound");
 console.log("manual apply tests passed");
+
+const permissive = { ...rules, never_move_unread: false, skip_flagged: false };
+assert.equal(previewMoves(messages, permissive).length, 1, "safety guards cannot be disabled by rules");

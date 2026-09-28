@@ -12,13 +12,20 @@ const TOKEN_URL = "https://login.microsoftonline.com/consumers/oauth2/v2.0/token
 const ACCOUNT_LABELS = new Set(["personal-outlook-1", "personal-outlook-2", "personal-outlook-3"]);
 const PROTECTED_DESTINATIONS = new Set(["inbox", "deleted items", "deleted", "trash", "junk email", "junk", "drafts", "sent items", "outbox"]);
 
-Deno.serve(async (request) => {
+Deno.serve(handleRequest);
+
+export async function handleRequest(request: Request) {
   if (request.method !== "POST") return json({ error: "POST only" }, 405);
   if (!invocationAllowed(request.headers.get("authorization"), Deno.env.get("ORGANIZER_INVOKE_SECRET"))) {
     return json({ error: "unauthorized" }, 401);
   }
-  const parsed = await request.json().catch(() => ({}));
-  const body: RequestBody = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+  const parsed = await request.json().catch(() => null);
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed) ||
+      ["manual", "preview", "apply"].some((key) => key in parsed && typeof parsed[key] !== "boolean") ||
+      ["run_key", "preview_run_key"].some((key) => key in parsed && typeof parsed[key] !== "string")) {
+    return json({ error: "invalid request body" }, 400);
+  }
+  const body: RequestBody = parsed;
   if (body.preview === true && body.manual !== true) return json({ error: "preview requires a manual run" }, 400);
 
   const applying = body.apply === true;
@@ -33,8 +40,14 @@ Deno.serve(async (request) => {
     return json({ error: "invalid manual apply request" }, 400);
   }
 
-  const supabase = supabaseClient();
-  const claimed = await supabase.rpcClaim(slot, body.preview === true);
+  let supabase: ReturnType<typeof supabaseClient>;
+  let claimed: string | null;
+  try {
+    supabase = supabaseClient();
+    claimed = await supabase.rpcClaim(slot, body.preview === true);
+  } catch {
+    return json({ action: "failed", slot, error: "run claim was not saved" }, 500);
+  }
   if (!claimed) return json({ action: "skip", reason: "duplicate", slot });
 
   let accounts: OrganizerAccount[];
@@ -44,7 +57,9 @@ Deno.serve(async (request) => {
     await supabase.finish(claimed, "failed");
     return json({ action: "failed", slot, error: "account list was not read" }, 500);
   }
-  if (accounts.length !== 3) {
+  if (accounts.length !== 3 || new Set(accounts.map((account) => account?.label)).size !== 3 ||
+      accounts.some((account) => !account || !ACCOUNT_LABELS.has(account.label) ||
+        account.enabled !== true || account.provider !== "outlook" || account.role !== "personal")) {
     await supabase.finish(claimed, "failed");
     return json({ action: "failed", slot, error: "expected three personal Outlook accounts" }, 500);
   }
@@ -82,7 +97,6 @@ Deno.serve(async (request) => {
     try {
       const scan = await scanAccount(account, supabase);
       const summary = classifyInbox(scan.messages, rules);
-      summary.complete = scan.complete;
       const error = scan.complete ? null : "partial scan";
       const proposals = body.preview === true && scan.complete ? previewMoves(scan.messages, rules) : [];
       const previewHash = proposals.length > 0 ? await previewDigest(account.label, proposals) : null;
@@ -109,7 +123,7 @@ Deno.serve(async (request) => {
         } : {}),
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : "account run failed";
+      const message = "account scan failed";
       const stored = await supabase.saveResult(claimed, account.id, blankSummary(), {
         mode: "dry_run",
         filed: 0,
@@ -129,7 +143,7 @@ Deno.serve(async (request) => {
     ...(body.preview === true ? { preview_run_key: body.run_key } : {}),
     results,
   }, status === "dry_run_complete" ? 200 : 500);
-});
+}
 
 type OrganizerAccount = {
   id: string;
@@ -194,7 +208,7 @@ async function applyOneAccount({ body, slot, runId, account, supabase }: {
   try {
     scan = await scanAccount(account, supabase);
   } catch (error) {
-    const message = error instanceof Error ? error.message : "account run failed";
+    const message = "account scan failed";
     const stored = await supabase.saveResult(runId, account.id, summary, {
       mode: "apply",
       filed: 0,
@@ -335,7 +349,7 @@ async function applyOneAccount({ body, slot, runId, account, supabase }: {
     deferred: candidates.length - batch.length,
     error: !stored ? "result write failed" : !finished ? "run status was not saved" : error,
   };
-  return json({ action: status, slot, preview_run_key: body.preview_run_key, apply: true, results: [result] }, complete && stored && finished ? 200 : 207);
+  return json({ action: !finished && moved > 0 ? "apply_partial" : status, slot, preview_run_key: body.preview_run_key, apply: true, results: [result] }, complete && stored && finished ? 200 : 207);
 }
 
 function blankSummary() {
@@ -369,10 +383,13 @@ function supabaseClient() {
       if (response.status === 409) return null;
       if (!response.ok) throw new Error("run claim was not saved");
       const rows = await response.json();
-      return Array.isArray(rows) && rows[0] ? rows[0].id : null;
+      if (!Array.isArray(rows)) throw new Error("run claim was not saved");
+      if (rows.length === 0) return null;
+      if (typeof rows[0]?.id !== "string" || !rows[0].id) throw new Error("run claim was not saved");
+      return rows[0].id;
     },
     async accounts(): Promise<OrganizerAccount[]> {
-      const response = await fetch(`${url}/rest/v1/organizer_accounts?enabled=eq.true&provider=eq.outlook&role=eq.personal&select=id,label,provider,role,enabled,apply_enabled&limit=3`, { headers });
+      const response = await fetch(`${url}/rest/v1/organizer_accounts?enabled=eq.true&provider=eq.outlook&role=eq.personal&select=id,label,provider,role,enabled,apply_enabled&limit=4`, { headers });
       if (!response.ok) throw new Error("account list was not read");
       const rows = await response.json();
       if (!Array.isArray(rows)) throw new Error("account list was not read");
@@ -452,16 +469,18 @@ function supabaseClient() {
           error: result.error,
           summary: { by_folder: summary.by_folder, ...(result.details ?? {}), ...(typeof (summary as Record<string, unknown>).preview_hash === "string" ? { preview_hash: (summary as Record<string, unknown>).preview_hash } : {}) },
         }),
-      });
-      return response.ok;
+      }).catch(() => null);
+      return response?.ok ?? false;
     },
     async finish(runId: string, status: string) {
       const response = await fetch(`${url}/rest/v1/organizer_runs?id=eq.${runId}`, {
         method: "PATCH",
         headers: { ...headers, prefer: "return=representation" },
         body: JSON.stringify({ status, finished_at: new Date().toISOString() }),
-      });
-      return response.ok;
+      }).catch(() => null);
+      if (!response?.ok) return false;
+      const rows = await response.json().catch(() => null);
+      return Array.isArray(rows) && rows.length === 1 && rows[0]?.id === runId;
     },
   };
 }
@@ -493,31 +512,56 @@ async function listInbox(accessToken: string) {
   const inbox = await folderResponse.json();
   if (typeof inbox.id !== "string") throw new Error("inbox was not identified");
   const messages = [];
+  const seenPages = new Set<string>();
+  const seenMessages = new Set<string>();
   let next: string | null = `${GRAPH}/me/mailFolders/inbox/messages?$top=50&$select=id,subject,from,isRead,flag,parentFolderId`;
   while (next) {
+    if (seenPages.has(next) || seenPages.size >= 1000) throw new Error("repeated or excessive mailbox pages");
+    seenPages.add(next);
     const response = await graphFetch(accessToken, next);
     const page = await response.json();
-    messages.push(...(page.value ?? []));
+    if (!page || !Array.isArray(page.value)) throw new Error("invalid mailbox page");
+    for (const message of page.value) {
+      if (!message || typeof message.id !== "string" || !message.id || seenMessages.has(message.id)) {
+        throw new Error("invalid or duplicate message");
+      }
+      seenMessages.add(message.id);
+      messages.push(message);
+    }
     next = page["@odata.nextLink"] ?? null;
+    if (next !== null && (typeof next !== "string" || !next)) throw new Error("invalid next link");
     if (next && messages.length >= 10000) return { messages, complete: false, inboxId: inbox.id };
   }
   return { messages, complete: true, inboxId: inbox.id };
 }
 
-async function resolveDestinationFolders(accessToken: string, names: string[]) {
+export async function resolveDestinationFolders(accessToken: string, names: string[]) {
   // Match the configured display name exactly; no trimming or case folding.
   const wanted = new Set(names);
   for (const name of wanted) {
     if (PROTECTED_DESTINATIONS.has(name.trim().toLowerCase())) throw new Error("protected destination");
   }
+  // Well-known IDs also protect renamed and localized system folders.
+  const protectedIds = new Set<string>();
+  for (const name of ["inbox", "deleteditems", "junkemail", "drafts", "sentitems", "outbox"]) {
+    const response = await graphFetch(accessToken, `${GRAPH}/me/mailFolders/${name}?$select=id`);
+    const folder = await response.json();
+    if (typeof folder?.id !== "string" || !folder.id) throw new Error("protected folder id missing");
+    protectedIds.add(folder.id);
+  }
   const wantedFolded = new Set([...wanted].map((name) => name.trim().toLowerCase()));
   const result = new Map<string, string>();
   const seenFolded = new Set<string>();
+  const seenPages = new Set<string>();
   let next: string | null = `${GRAPH}/me/mailFolders?$top=100&$select=id,displayName,parentFolderId`;
   while (next) {
+    if (seenPages.has(next) || seenPages.size >= 1000) throw new Error("repeated or excessive folder pages");
+    seenPages.add(next);
     const response = await graphFetch(accessToken, next);
     const page = await response.json();
-    for (const folder of page.value ?? []) {
+    if (!page || !Array.isArray(page.value)) throw new Error("invalid folder page");
+    for (const folder of page.value) {
+      if (!folder || typeof folder !== "object") throw new Error("invalid folder");
       const name = String(folder.displayName ?? "");
       const folded = name.trim().toLowerCase();
       if (!wantedFolded.has(folded)) continue;
@@ -527,10 +571,12 @@ async function resolveDestinationFolders(accessToken: string, names: string[]) {
       seenFolded.add(folded);
       if (!wanted.has(name)) continue;
       // /me/mailFolders returns root children; their parentFolderId is the mailbox root.
-      if (typeof folder.id !== "string") throw new Error("destination folder id missing");
+      if (protectedIds.has(folder.id)) throw new Error("protected destination");
+      if (typeof folder.id !== "string" || !folder.id) throw new Error("destination folder id missing");
       result.set(name, folder.id);
     }
     next = page["@odata.nextLink"] ?? null;
+    if (next !== null && (typeof next !== "string" || !next)) throw new Error("invalid next link");
   }
   if (result.size !== wanted.size) throw new Error("destination folder missing");
   return result;
@@ -552,8 +598,8 @@ async function moveMessage(accessToken: string, messageId: string, destinationId
 
 async function graphFetch(accessToken: string, url: string) {
   // Never send the mailbox token off-host, including via @odata.nextLink.
-  if (!url.startsWith(`${GRAPH}/`)) throw new Error("unexpected Graph URL");
-  const response = await fetch(url, { headers: { authorization: `Bearer ${accessToken}`, prefer: 'IdType="ImmutableId"' } });
+  if (typeof url !== "string" || !url.startsWith(`${GRAPH}/`)) throw new Error("unexpected Graph URL");
+  const response = await fetch(url, { redirect: "error", headers: { authorization: `Bearer ${accessToken}`, prefer: 'IdType="ImmutableId"' } });
   if (!response.ok) throw new Error("mailbox request failed");
   return response;
 }

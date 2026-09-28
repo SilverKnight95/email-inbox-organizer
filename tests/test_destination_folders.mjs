@@ -1,26 +1,20 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-
-const source = readFileSync(new URL("../supabase/functions/outlook-sort/index.ts", import.meta.url), "utf8");
-const start = source.indexOf("async function resolveDestinationFolders(");
-const end = source.indexOf("\nasync function getMessage(", start);
-const { stripTypeScriptTypes } = await import("node:module");
-const resolverSource = stripTypeScriptTypes(source.slice(start, end));
+globalThis.Deno = { serve() {}, env: { get() {} } };
+const { resolveDestinationFolders } = await import("../supabase/functions/outlook-sort/index.ts");
 const GRAPH = "https://graph.microsoft.com/v1.0";
-const PROTECTED_DESTINATIONS = new Set(["inbox", "deleted items", "trash", "junk email", "drafts", "sent items"]);
 
 async function resolve(pages, names) {
   let calls = 0;
-  const graphFetch = async (_token, url) => {
+  globalThis.fetch = async (url) => {
+    const system = new URL(url).pathname.match(/\/mailFolders\/(inbox|deleteditems|junkemail|drafts|sentitems|outbox)$/);
+    if (system) return Response.json({ id: `${system[1]}-id` });
     assert.equal(url.startsWith(GRAPH + "/me/mailFolders?"), true);
     assert.equal(url.includes("/childFolders"), false);
     const page = pages[calls++];
     assert.ok(page, "unexpected request");
-    return { json: async () => page };
+    return Response.json(page);
   };
-  const resolver = new Function("GRAPH", "PROTECTED_DESTINATIONS", "graphFetch",
-    resolverSource + "; return resolveDestinationFolders;")(GRAPH, PROTECTED_DESTINATIONS, graphFetch);
-  return resolver("synthetic-token", names);
+  return resolveDestinationFolders("synthetic-token", names);
 }
 const rootChild = { id: "promotions-id", displayName: "Promotions", parentFolderId: "mailbox-root-id" };
 assert.equal((await resolve([{ value: [rootChild] }], ["Promotions"])).get("Promotions"), "promotions-id");
@@ -36,3 +30,10 @@ const paged = await resolve([
 ], ["Promotions"]);
 assert.equal(paged.get("Promotions"), "promotions-id");
 console.log("folder resolver: root parent, missing, duplicate, protected, pagination passed");
+
+for (const name of ["inbox", "deleteditems", "junkemail", "drafts", "sentitems", "outbox"]) {
+  await assert.rejects(resolve([{ value: [{ id: `${name}-id`, displayName: "Promotions" }] }], ["Promotions"]), /protected/);
+}
+await assert.rejects(resolve([{}], ["Promotions"]), /invalid folder page/);
+await assert.rejects(resolve([{ value: [], "@odata.nextLink": GRAPH + "/me/mailFolders?$top=100&$select=id,displayName,parentFolderId" }], ["Promotions"]), /repeated/);
+console.log("folder resolver: localized system folders and malformed pagination passed");

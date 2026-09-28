@@ -10,7 +10,7 @@ export function invocationAllowed(authorization: string | null, secret: string |
 }
 
 export function manualSlot(runKey: string) {
-  if (!/^[A-Za-z0-9_-]{8,64}$/.test(runKey || "")) throw new Error("invalid manual run key");
+  if (typeof runKey !== "string" || !/^[A-Za-z0-9_-]{8,64}$/.test(runKey)) throw new Error("invalid manual run key");
   return `manual:${runKey}`;
 }
 

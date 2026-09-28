@@ -52,7 +52,7 @@ python3 scripts/outlook_authorize.py \
   --callback-url "$CALLBACK_URL"
 ```
 
-Before `--complete`, set that slot's `account_key` in the database. The key is the first 16 hex characters of SHA-256 of the Microsoft Graph user id. It is not an email address. The script reads `/me`, computes that key, and stores the refresh token only when it matches the slot. Success prints the label, `stored`, `apply_enabled`, and `account_key`. It does not print the token or the mailbox address. A mismatch stores nothing and still prints the signed-in `account_key` so you can confirm which account you used.
+Before `--complete`, set that slot's `account_key` in the database. The key is the first 16 hex characters of SHA-256 of the Microsoft Graph user id. It is not an email address. Reauthorizing an account resets its `apply_enabled` flag to false. The script reads `/me`, computes that key, and stores the refresh token only when it matches the slot. Success prints the label, `stored`, `apply_enabled`, and `account_key`. It does not print the token or the mailbox address. A mismatch stores nothing and still prints the signed-in `account_key` so you can confirm which account you used.
 
 ## 5. Review a dry run
 

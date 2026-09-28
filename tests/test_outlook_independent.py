@@ -10,6 +10,8 @@ sys.path.insert(0, str(ROOT / "scripts"))
 from email_inbox_organizer.graph_auth import authorize_url, exchange_code, refresh_access_token
 from outlook_authorize import parse_callback
 from email_inbox_organizer.outlook_adapter import (
+    GraphError,
+    graph_path,
     ReadOnlyGraph,
     accept_refreshed_token,
     apply_filing,
@@ -180,6 +182,29 @@ def test_monday_and_thursday_chicago_slot_and_duplicate_guard():
     second = begin_scheduled_run(monday, store)
     assert first == {"action": "run", "slot": "2026-09-28T08", "apply": False}
     assert second["reason"] == "duplicate"
+
+
+def test_pagination_rejects_unsafe_links_and_incomplete_payloads():
+    for link in ("//evil.example/path", "http://graph.microsoft.com/v1.0/me/messages", "https://graph.microsoft.com/beta/me/messages", "https://evil.example/v1.0/me/messages", False, ""):
+        try:
+            graph_path(link)
+        except GraphError:
+            pass
+        else:
+            raise AssertionError("unsafe next link accepted")
+    assert graph_path("https://graph.microsoft.com/v1.0/me/messages?$skip=2") == "/me/messages?$skip=2"
+    for page in ({}, {"value": {}}, {"value": [None]}, {"value": [{"id": "1"}, {"id": "1"}]}, {"value": [], "@odata.nextLink": False}, {"value": [], "@odata.nextLink": "/me/mailFolders/inbox/messages"}):
+        calls = []
+        def transport(*args):
+            calls.append(args)
+            assert len(calls) < 3, "pagination did not terminate"
+            return page
+        try:
+            list_inbox(ReadOnlyGraph(transport))
+        except GraphError:
+            pass
+        else:
+            raise AssertionError("invalid page accepted as a complete scan")
 
 
 if __name__ == "__main__":
