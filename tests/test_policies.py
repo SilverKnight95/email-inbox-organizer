@@ -58,6 +58,17 @@ def test_trash_only_successful_marketing():
     assert review("Health", "Tips for you", "success", "deals@news.example") == "review"
 
 
+def test_read_and_flag_guards_cannot_be_disabled():
+    permissive = {"never_move_unread": False, "skip_flagged": False,
+                  "auto_file": [{"match": "domain", "value": "news.example", "folder": "Newsletters"}]}
+    base = {"from": {"emailAddress": {"address": "deals@news.example"}}, "subject": "Weekly news"}
+    for state in (None, False, "true", 1):
+        assert classify({**base, "isRead": state}, permissive)["action"] != "move"
+    assert classify(base, permissive)["action"] != "move"
+    assert classify({**base, "isRead": True, "flag": {"flagStatus": "flagged"}}, permissive)["action"] != "move"
+    assert classify({**base, "isRead": True}, permissive)["action"] == "move"
+
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):

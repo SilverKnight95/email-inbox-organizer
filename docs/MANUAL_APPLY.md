@@ -13,7 +13,7 @@ The manual call verifies that `preview_run_key` identifies a completed manual pr
 
 Each apply call is limited to five messages in one personal Outlook account. A unique run key is claimed once in `organizer_runs`; repeat requests with that key are skipped. If a request stops partway through, already moved messages are no longer in Inbox and will not be selected by a later preview. Results report scanned, eligible, attempted, moved, skipped, failed, and deferred counts for that account. The database stores counts only.
 
-Destination folders must already exist as unique top-level folders with the exact configured name. Missing, ambiguous, Inbox, Deleted Items, Trash, Junk, Drafts, Sent Items, or Outbox destinations fail closed. No message is deleted, unsubscribed, or sent.
+Destination folders must already exist as unique top-level folders with the exact configured name. Missing, ambiguous, Inbox, Deleted Items, Trash, Junk, Drafts, Sent Items, or Outbox destinations fail closed. System folders are also checked by their Graph IDs, so localized or renamed system folders remain protected. Failure to identify a system folder prevents filing. No message is deleted, unsubscribed, or sent.
 
 Apply request body shape:
 

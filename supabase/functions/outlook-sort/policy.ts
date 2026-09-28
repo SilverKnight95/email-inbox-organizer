@@ -95,10 +95,10 @@ function classifyOne(message: MailMessage, rules: Rules) {
   const subject = message.subject ?? "";
   const email = message.from?.emailAddress?.address?.toLowerCase() ?? "";
   const domain = email.includes("@") ? email.split("@")[1] : email;
-  if (rules.never_move_unread !== false && message.isRead === false) return "unread";
+  if (message.isRead === false) return "unread";
   // Missing read state is uncertain; preserve it for review.
   if (message.isRead !== true) return "review";
-  if (rules.skip_flagged !== false && message.flag?.flagStatus === "flagged") return "flagged";
+  if (message.flag?.flagStatus === "flagged") return "flagged";
   if (protectedSubject.test(subject)) return "review";
   if (subject.toLowerCase().startsWith("inbox digest")) return "review";
   const safetyHold = rules.global_exclude_subject

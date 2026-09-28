@@ -29,6 +29,12 @@ This repository does not contain mailbox contents, sender address lists, contact
 ```bash
 python3 tests/test_outlook_independent.py
 python3 tests/test_policies.py
+python3 tests/test_invocation.py
+node tests/test_manual_apply.mjs
+node tests/test_destination_folders.mjs
+node tests/test_edge_handler.mjs
 ```
 
-No network and no mail account is required.
+The tests require Python 3.9+ and Node.js 24+ (for native TypeScript imports). No network or mail account is required.
+
+Check the deployed function types with `deno check supabase/functions/outlook-sort/index.ts`.
