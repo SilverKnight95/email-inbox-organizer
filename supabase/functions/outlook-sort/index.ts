@@ -34,7 +34,7 @@ Deno.serve(async (request) => {
   }
 
   const supabase = supabaseClient();
-  const claimed = await supabase.rpcClaim(slot);
+  const claimed = await supabase.rpcClaim(slot, body.preview === true);
   if (!claimed) return json({ action: "skip", reason: "duplicate", slot });
 
   let accounts: OrganizerAccount[];
@@ -61,7 +61,11 @@ Deno.serve(async (request) => {
         mode: "apply", filed: 0, complete: false, error: "manual filing is not enabled for this account",
       });
       await supabase.finish(claimed, "failed");
-      return json({ action: "failed", slot, results: [{ account_label: account.label, complete: false, stored, error: "manual filing is not enabled for this account" }] }, 403);
+      return json({ action: "failed", slot, results: [{
+        account_label: account.label, complete: false, stored,
+        scanned: 0, eligible: 0, attempted: 0, moved: 0, skipped: 0, failed: 0, deferred: 0,
+        error: stored ? "manual filing is not enabled for this account" : "result write failed",
+      }] }, 403);
     }
     return await applyOneAccount({ body, slot, runId: claimed, account, supabase });
   }
@@ -80,6 +84,8 @@ Deno.serve(async (request) => {
       const stored = await supabase.saveResult(claimed, account.id, summary, {
         mode: "dry_run", filed: 0, complete: scan.complete, error,
       });
+      const proposals = body.preview === true && stored && scan.complete ? previewMoves(scan.messages, rules) : [];
+      const batchIds = new Set(manualBatch(proposals).map((move) => move.messageId));
       results.push({
         account_id: account.id,
         complete: stored && scan.complete,
@@ -87,9 +93,11 @@ Deno.serve(async (request) => {
         error: stored ? error : "result write failed",
         ...(body.preview === true && stored && scan.complete ? {
           account_label: account.label,
-          proposed_moves: previewMoves(scan.messages, rules).map(({ from, subject, folder }) => ({ from, subject, folder })),
-          apply_batch_size: Math.min(previewMoves(scan.messages, rules).length, 5),
-          preview_hash: await previewDigest(account.label, previewMoves(scan.messages, rules)),
+          proposed_moves: proposals.map(({ messageId, from, subject, folder }) => ({
+            from, subject, folder, in_apply_batch: batchIds.has(messageId),
+          })),
+          apply_batch_size: batchIds.size,
+          preview_hash: await previewDigest(account.label, proposals),
         } : {}),
       });
     } catch (error) {
@@ -149,6 +157,19 @@ async function applyOneAccount({ body, slot, runId, account, supabase }: {
   supabase: ReturnType<typeof supabaseClient>;
 }) {
   const summary = blankSummary();
+  const previewExists = await supabase.verifyPreview(body.preview_run_key!, account.id);
+  if (!previewExists) {
+    const error = "the referenced completed manual preview was not found for this account";
+    const stored = await supabase.saveResult(runId, account.id, summary, {
+      mode: "apply", filed: 0, complete: false, error,
+    });
+    await supabase.finish(runId, "failed");
+    return json({ action: "failed", slot, results: [{
+      account_label: account.label, complete: false, stored,
+      scanned: 0, eligible: 0, attempted: 0, moved: 0, skipped: 0, failed: 0, deferred: 0,
+      error: stored ? error : "result write failed",
+    }] }, 409);
+  }
   let scan: Awaited<ReturnType<typeof scanAccount>>;
   try {
     scan = await scanAccount(account, supabase);
@@ -158,7 +179,11 @@ async function applyOneAccount({ body, slot, runId, account, supabase }: {
       mode: "apply", filed: 0, complete: false, error: message,
     });
     await supabase.finish(runId, "failed");
-    return json({ action: "failed", slot, results: [{ account_label: account.label, complete: false, stored, moved: 0, error: stored ? message : "result write failed" }] }, 500);
+    return json({ action: "failed", slot, results: [{
+      account_label: account.label, complete: false, stored,
+      scanned: 0, eligible: 0, attempted: 0, moved: 0, skipped: 0, failed: 0, deferred: 0,
+      error: stored ? message : "result write failed",
+    }] }, 500);
   }
 
   const candidates = previewMoves(scan.messages, rules);
@@ -174,7 +199,12 @@ async function applyOneAccount({ body, slot, runId, account, supabase }: {
       details: { attempted: 0, moved: 0, skipped: 0, failed: 0, deferred: Math.max(0, candidates.length - batch.length) },
     });
     await supabase.finish(runId, "failed");
-    return json({ action: "failed", slot, results: [{ account_label: account.label, complete: false, stored, scanned: scan.messages.length, eligible: candidates.length, attempted: 0, moved: 0, error: stored ? error : "result write failed" }] }, 409);
+    return json({ action: "failed", slot, results: [{
+      account_label: account.label, complete: false, stored,
+      scanned: scan.messages.length, eligible: candidates.length, attempted: 0, moved: 0,
+      skipped: 0, failed: 0, deferred: Math.max(0, candidates.length - batch.length),
+      error: stored ? error : "result write failed",
+    }] }, 409);
   }
 
   let folderIds: Map<string, string>;
@@ -184,10 +214,15 @@ async function applyOneAccount({ body, slot, runId, account, supabase }: {
     const error = "one or more destination folders could not be resolved safely; no messages moved";
     const stored = await supabase.saveResult(runId, account.id, summary, {
       mode: "apply", filed: 0, complete: false, error,
-      details: { attempted: 0, moved: 0, skipped: 0, failed: batch.length, deferred: candidates.length - batch.length },
+      details: { attempted: 0, moved: 0, skipped: 0, failed: 0, folder_resolution_failed: 1, deferred: candidates.length - batch.length },
     });
     await supabase.finish(runId, "failed");
-    return json({ action: "failed", slot, results: [{ account_label: account.label, complete: false, stored, scanned: scan.messages.length, eligible: candidates.length, attempted: 0, moved: 0, error: stored ? error : "result write failed" }] }, 500);
+    return json({ action: "failed", slot, results: [{
+      account_label: account.label, complete: false, stored,
+      scanned: scan.messages.length, eligible: candidates.length, attempted: 0, moved: 0,
+      skipped: 0, failed: 0, deferred: Math.max(0, candidates.length - batch.length),
+      error: stored ? error : "result write failed",
+    }] }, 500);
   }
 
   let moved = 0;
@@ -197,7 +232,9 @@ async function applyOneAccount({ body, slot, runId, account, supabase }: {
   for (const candidate of batch) {
     try {
       const current = await getMessage(scan.accessToken, candidate.messageId);
+      const currentFrom = current.from?.emailAddress?.address ?? "";
       if (current.parentFolderId !== scan.inboxId || current.isRead !== true ||
+        current.subject !== candidate.subject || currentFrom.toLowerCase() !== candidate.from.toLowerCase() ||
         current.flag?.flagStatus === "flagged" || fileDecision(current, rules) !== `file:${candidate.folder}`) {
         skipped++;
         continue;
@@ -264,11 +301,11 @@ function supabaseClient() {
   if (!url || !key) throw new Error("supabase service configuration is missing");
   const headers = { apikey: key, authorization: `Bearer ${key}`, "content-type": "application/json" };
   return {
-    async rpcClaim(slot: string) {
+    async rpcClaim(slot: string, preview = false) {
       const response = await fetch(`${url}/rest/v1/organizer_runs`, {
         method: "POST",
         headers: { ...headers, prefer: "return=representation,resolution=ignore-duplicates" },
-        body: JSON.stringify({ slot_key: slot, status: "running" }),
+        body: JSON.stringify({ slot_key: slot, status: "running", preview }),
       });
       if (response.status === 409) return null;
       if (!response.ok) throw new Error("run claim was not saved");
@@ -281,6 +318,16 @@ function supabaseClient() {
       const rows = await response.json();
       if (!Array.isArray(rows)) throw new Error("account list was not read");
       return rows;
+    },
+    async verifyPreview(previewRunKey: string, accountId: string) {
+      const runResponse = await fetch(`${url}/rest/v1/organizer_runs?slot_key=eq.${encodeURIComponent(`manual:${previewRunKey}`)}&status=eq.dry_run_complete&preview=eq.true&select=id&limit=1`, { headers });
+      if (!runResponse.ok) return false;
+      const runs = await runResponse.json();
+      if (!Array.isArray(runs) || typeof runs[0]?.id !== "string") return false;
+      const resultResponse = await fetch(`${url}/rest/v1/organizer_run_results?run_id=eq.${encodeURIComponent(runs[0].id)}&account_id=eq.${encodeURIComponent(accountId)}&mode=eq.dry_run&complete=eq.true&select=id&limit=1`, { headers });
+      if (!resultResponse.ok) return false;
+      const results = await resultResponse.json();
+      return Array.isArray(results) && typeof results[0]?.id === "string";
     },
     async token(accountId: string) {
       const response = await fetch(`${url}/rest/v1/rpc/organizer_refresh_token`, {

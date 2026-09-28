@@ -8,6 +8,9 @@ alter table organizer_runs
   add constraint organizer_runs_status_check
   check (status in ('running', 'dry_run_complete', 'incomplete', 'failed', 'apply_complete', 'apply_partial'));
 
+alter table organizer_runs
+  add column if not exists preview boolean not null default false;
+
 alter table organizer_run_results
   drop constraint if exists organizer_run_results_mode_check;
 

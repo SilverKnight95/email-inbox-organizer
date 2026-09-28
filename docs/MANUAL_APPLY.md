@@ -5,11 +5,11 @@ Scheduled calls remain dry-run only: `supabase/schedule.sql` posts `{"apply": fa
 ## Review, then apply one small batch
 
 1. Run a new manual preview with `manual: true`, `preview: true`, `apply: false`, and a unique `run_key`.
-2. Review every proposed sender, subject, and destination for the selected account. The response includes a `preview_hash` for that account. It includes no message body or Graph message ID.
+2. Review the proposed sender, subject, and destination for the selected account. Only entries marked `in_apply_batch: true` can move in this first batch; the response includes a `preview_hash` for that exact set. It includes no message body or Graph message ID.
 3. Enable `apply_enabled` for only the account you intend to test. It is a separate database gate; accounts remain disabled for filing by default.
 4. Apply with a different unique `run_key`, the preview's `preview_run_key`, account `account_label`, exact `preview_hash`, and `confirmation: "FILE REVIEWED PREVIEW"`.
 
-The manual call recalculates the candidate set and checks the preview hash before any move. It aborts without moving mail if the scan is partial or any candidate sender, subject, destination, or set membership changed. It then rechecks each message's Inbox location, read state, flag state, and filing rule immediately before moving it.
+The manual call verifies that `preview_run_key` identifies a completed manual preview with a complete result for the selected account. It recalculates the candidate set and checks the preview hash before any move. It aborts without moving mail if the scan is partial or any candidate sender, subject, destination, or set membership changed. It then rechecks each message's Inbox location, sender, subject, read state, flag state, and filing rule immediately before moving it.
 
 Each apply call is limited to five messages in one personal Outlook account. A unique run key is claimed once in `organizer_runs`; repeat requests with that key are skipped. If a request stops partway through, already moved messages are no longer in Inbox and will not be selected by a later preview. Results report scanned, eligible, attempted, moved, skipped, failed, and deferred counts for that account. The database stores counts only.
 
