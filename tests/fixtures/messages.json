@@ -1,0 +1,32 @@
+[
+  {
+    "id": "fixture-unread-newsletter",
+    "subject": "Weekly deals",
+    "isRead": false,
+    "from": {"emailAddress": {"address": "deals@news.example", "name": "Deals"}}
+  },
+  {
+    "id": "fixture-read-newsletter",
+    "subject": "Weekly deals",
+    "isRead": true,
+    "from": {"emailAddress": {"address": "deals@news.example", "name": "Deals"}}
+  },
+  {
+    "id": "fixture-security",
+    "subject": "Your verification code is 000000",
+    "isRead": true,
+    "from": {"emailAddress": {"address": "deals@news.example", "name": "Deals"}}
+  },
+  {
+    "id": "fixture-receipt",
+    "subject": "Your receipt",
+    "isRead": true,
+    "from": {"emailAddress": {"address": "receipts@pay.example", "name": "Pay"}}
+  },
+  {
+    "id": "fixture-declined",
+    "subject": "Payment declined",
+    "isRead": true,
+    "from": {"emailAddress": {"address": "receipts@pay.example", "name": "Pay"}}
+  }
+]

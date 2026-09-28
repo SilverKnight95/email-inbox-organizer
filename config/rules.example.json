@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "mode": "confirmed-buckets",
+  "never_move_unread": true,
+  "skip_flagged": true,
+  "digest_via": "session",
+  "global_exclude_subject": "(?i)(password|passcode|sign[- ]?in|verification code|security alert|fraud|invoice|statement|declined|action needed|bill is ready|settlement|court)",
+  "auto_file": [
+    {
+      "match": "sender",
+      "value": "deals@news.example",
+      "folder": "Newsletters",
+      "reason": "Synthetic newsletter",
+      "bypass_safety": false
+    },
+    {
+      "match": "domain_suffix",
+      "value": "github.example",
+      "folder": "GITHUB",
+      "reason": "Synthetic dev notices",
+      "bypass_safety": true
+    },
+    {
+      "match": "subject",
+      "value": "(password|verification code|sign[- ]?in)",
+      "folder": "Security",
+      "reason": "Synthetic security subject",
+      "bypass_safety": true
+    }
+  ],
+  "receipts": [
+    {
+      "match": "sender",
+      "value": "receipts@pay.example",
+      "folder": "Finance",
+      "reason": "Synthetic receipt",
+      "include_subject": "(?i)(receipt|you paid)",
+      "exclude_subject": "(?i)(declined|action needed|password)"
+    }
+  ],
+  "suggest": []
+}

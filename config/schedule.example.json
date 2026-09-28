@@ -1,0 +1,22 @@
+{
+  "name": "Weekday inbox sort",
+  "timezone": "America/Chicago",
+  "cron": "0 8 * * 1,4",
+  "human": "Monday and Thursday at 8:00 a.m. Central",
+  "command": "python3 scripts/sort_all.py --apply",
+  "does": [
+    "File read mail that matches rules into the mapped folder or label",
+    "Leave every unread message in the inbox",
+    "Leave flagged mail in the inbox",
+    "Do not delete mail",
+    "Do not send mail",
+    "Do not add accounts",
+    "Do not widen rules during the run",
+    "Reply with a short per-account summary"
+  ],
+  "does_not": [
+    "Unsubscribe",
+    "Move mail to Trash or Deleted Items",
+    "Touch a school mailbox"
+  ]
+}

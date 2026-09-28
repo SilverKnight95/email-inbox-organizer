@@ -1,0 +1,13 @@
+accounts.json
+.env
+state.json
+logs/
+digests/
+results.jsonl
+progress.json
+eligible-delete-senders.json
+mailto-sent.json
+delete-review.json
+delete-report.json
+__pycache__/
+*.pyc

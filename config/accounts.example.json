@@ -1,0 +1,26 @@
+[
+  {
+    "provider": "outlook",
+    "email": "primary@example.com",
+    "id": "OUTLOOK_ACCOUNT_ID_1",
+    "role": "primary personal"
+  },
+  {
+    "provider": "outlook",
+    "email": "second@example.com",
+    "id": "OUTLOOK_ACCOUNT_ID_2",
+    "role": "personal"
+  },
+  {
+    "provider": "outlook",
+    "email": "third@example.com",
+    "id": "OUTLOOK_ACCOUNT_ID_3",
+    "role": "personal"
+  },
+  {
+    "provider": "gmail",
+    "email": "oldest@example.com",
+    "id": "GMAIL_ACCOUNT_ID",
+    "role": "oldest personal"
+  }
+]
