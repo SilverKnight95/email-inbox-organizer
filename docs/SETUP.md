@@ -22,7 +22,7 @@ Set these in Supabase, not in git:
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `ORGANIZER_INVOKE_SECRET`
 
-The Azure app is a confidential client. Redirect URI: `http://127.0.0.1:8787/callback`. Scopes: `offline_access`, `User.Read`, and `Mail.ReadWrite`. Tenant: `consumers`.
+The Azure app is a confidential client. Redirect URI: `http://localhost:8787/callback`. Scopes: `offline_access`, `User.Read`, and `Mail.ReadWrite`. Tenant: `consumers`.
 
 ## 3. Deploy the function
 
@@ -74,3 +74,7 @@ A complete run has status `dry_run_complete` and one result per account with `co
 `supabase/schedule.sql` is the Monday/Thursday 8:00 a.m. America/Chicago checker. Do not run it until the dry run above has been reviewed. It posts `{"apply": false}` and does not file mail.
 
 Do not set `apply_enabled`. Do not change the Gamut agent.
+
+## Windows PowerShell
+
+Run `npx.cmd supabase ...` if PowerShell blocks `npx.ps1`. Use `python` instead of `python3`. The authorization script stores its temporary state in the operating system's temp directory, outside the repo. For each account, run `git pull` first to get the localhost callback change. Keep the callback URL and all secrets out of chat and git.
