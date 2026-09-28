@@ -1,0 +1,15 @@
+{
+  "devDependencies": {
+    "@electric-sql/pglite": "0.3.14",
+    "supabase": "2.118.0",
+    "typescript": "5.9.3"
+  },
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "node tests/test_manual_apply.mjs && node tests/test_destination_folders.mjs && node --test tests/test_handler.mjs tests/test_database.mjs",
+    "test:python": "python3 tests/test_invocation.py && python3 tests/test_outlook_independent.py && python3 tests/test_policies.py"
+  },
+  "name": "email-inbox-organizer"
+}

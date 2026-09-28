@@ -18,6 +18,7 @@ const messages = [
   { id: "5", subject: "Unknown read state", from: { emailAddress: { address: "news@offers.example" } } },
   { id: "6", subject: "Personal", from: { emailAddress: { address: "friend@example.org" } }, isRead: true },
 ];
+for (const m of messages) if (!m.flag) m.flag = { flagStatus: "notFlagged" };
 const summary = classifyInbox(messages, rules);
 const moves = previewMoves(messages, rules);
 assert.equal(summary.would_file, 1);

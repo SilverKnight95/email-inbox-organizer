@@ -58,6 +58,7 @@ const messages = [
   { subject: "Flagged sale", from: { emailAddress: { address: "news@offers.example" } }, isRead: true, flag: { flagStatus: "flagged" } },
   { subject: "Personal", from: { emailAddress: { address: "friend@example.org" } }, isRead: true },
 ];
+for (const m of messages) if (!m.flag) m.flag = { flagStatus: "notFlagged" };
 const summary = classifyInbox(messages, rules);
 const preview = previewMoves(messages, rules);
 if (summary.would_file !== 1 || preview.length !== summary.would_file || preview[0].folder !== "Promotions" || JSON.stringify(preview).includes("do not return")) {
@@ -75,6 +76,7 @@ const sensitive = [
   { subject: "OAuth Application Approval", from: { emailAddress: { address: "noreply@microsoft.com" } }, isRead: true },
   { id: "weekly-news", subject: "Weekly product news", from: { emailAddress: { address: "news@microsoft.com" } }, isRead: true },
 ];
+for (const m of sensitive) m.flag = { flagStatus: "notFlagged" };
 if (classifyInbox(sensitive, sensitiveRules).would_file !== 1 || previewMoves(sensitive, sensitiveRules).length !== 1) {
   throw new Error("account and billing notices were filed by broad domain rules");
 }
