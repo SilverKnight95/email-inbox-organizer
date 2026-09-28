@@ -41,7 +41,14 @@ globalThis.fetch=async(input,options={})=>{
         if(fault.finish==='after') await rpc(db,name,body);
         throw Error('lost finish');
       }
-      try { return response(await rpc(db,name,body)); } catch(e) { return response({error:e.message},400); }
+      if(fault.rpcHttp && name==='organizer_plan_apply') return new Response(null,{status:500});
+      try {
+        const result = await rpc(db,name,body);
+        if (name === 'organizer_plan_apply' || name === 'organizer_step_apply') {
+          return new Response(null, {status: fault.empty200 ? 200 : 204});
+        }
+        return response(result);
+      } catch(e) { return response({error:e.message},400); }
     }
     if(options.method==='POST') {
       const keys=Object.keys(body);await db.query(`insert into ${name}(${keys.join(',')}) values (${keys.map((_,i)=>'$'+(i+1))})`,Object.values(body));return response(null,201);
@@ -140,4 +147,13 @@ test('preserves merged revocation behavior and accurate partial counts',async()=
   await reset(3);const p=await preview();fault.revoke=true;const r=await call(applyBody(p));
   assert.equal(r.action,'apply_partial');assert.equal(r.results[0].moved,1);assert.equal(r.results[0].attempted,1);assert.equal(r.results[0].skipped,2);
   const j=await journal();assert.equal(j.moved,1);assert.equal(j.skipped,2);assert.equal(j.active,false);
+});
+
+test('successful empty 200 void RPC replies complete without retaining the lease',async()=>{
+  await reset();const p=await preview();fault.empty200=true;const r=await call(applyBody(p));
+  assert.equal(r.action,'apply_complete');assert.equal(moves.length,2);assert.equal((await journal()).active,false);
+});
+test('unsuccessful empty RPC replies still stop apply before any move',async()=>{
+  await reset();const p=await preview();fault.rpcHttp=true;const r=await call(applyBody(p));
+  assert.equal(r.action,'recovery_required');assert.equal(moves.length,0);assert.equal((await journal()).active,true);
 });

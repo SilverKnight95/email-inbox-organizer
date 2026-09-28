@@ -286,7 +286,9 @@ function supabaseClient() {
   async function rpc(name: string, body: Record<string, unknown>) {
     const response = await fetch(`${url}/rest/v1/rpc/${name}`, { method: "POST", headers, body: JSON.stringify(body) });
     if (!response.ok) throw new Error("audit database request failed");
-    return await response.json();
+    if (response.status === 204) return null;
+    const text = await response.text();
+    return text.length === 0 ? null : JSON.parse(text);
   }
   return {
     async beginApply(runId: string, accountId: string) {
