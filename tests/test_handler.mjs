@@ -79,13 +79,19 @@ globalThis.fetch=async(input,options={})=>{
     return response({id},201);
   }
   if(url.pathname.endsWith('/mailFolders/inbox')) return response({id:'inbox-id'});
-  if(url.pathname.endsWith('/mailFolders')) return response({value:[{id:'target-id',displayName:rule.folder,parentFolderId:'root'}]});
+  if(url.pathname.endsWith('/mailFolders')) {
+    const folder={id:'target-id',displayName:rule.folder,parentFolderId:'root'};
+    if(fault.folderEmptyNext) return response({value:[folder],'@odata.nextLink':''});
+    return response({value:[folder]});
+  }
   if(url.pathname.endsWith('/inbox/messages')) {
     pages++;
     if(fault.partial) return response({value:Array.from({length:10000},(_,i)=>sample('m'+i)),'@odata.nextLink':'https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages?more=1'});
     if(fault.loop) return response({value:[sample('loop-message')],'@odata.nextLink':url.href});
     if(fault.malformed) return response({value:{not:'a list'}});
     if(fault.badNext) return response({value:[sample('bad-next')],'@odata.nextLink':'https://evil.example/steal'});
+    if(fault.schemeRelative) return response({value:[sample('scheme-relative')],'@odata.nextLink':'https://graph.microsoft.com/v1.0//evil.example/steal'});
+    if(fault.emptyNext) return response({value:[sample('empty-next')],'@odata.nextLink':''});
     if(fault.duplicate && !url.searchParams.has('more')) return response({value:[sample('duplicate-message')],'@odata.nextLink':'https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages?more=1'});
     if(fault.duplicate) return response({value:[sample('duplicate-message')]});
     if(fault.pagination && !url.searchParams.has('more')) return response({value:messages.slice(0,1),'@odata.nextLink':'https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages?more=1'});
@@ -148,7 +154,7 @@ test('unread recheck skips, pagination completes, partial scan blocks',async()=>
   await reset();const p2=await preview();fault.partial=true;assert.equal((await call(applyBody(p2))).action,'failed');assert.equal(moves.length,0);
 });
 test('malformed, duplicate, and looping Graph pages fail closed',async()=>{
-  for(const key of ['malformed','duplicate','loop','badNext']) {
+  for(const key of ['malformed','duplicate','loop','badNext','schemeRelative','emptyNext','folderEmptyNext']) {
     await reset();fault[key]=true;const r=await preview();assert.equal(r.action,'failed',key);assert.equal(r.results[0].error,'account scan failed',key);
     assert.ok(pages <= 2,`${key} should stop promptly`);
   }
