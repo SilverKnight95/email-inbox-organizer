@@ -10,10 +10,12 @@ sys.path.insert(0, str(ROOT / "scripts"))
 from email_inbox_organizer.graph_auth import authorize_url, exchange_code, refresh_access_token
 from outlook_authorize import parse_callback
 from email_inbox_organizer.outlook_adapter import (
+    GraphError,
     ReadOnlyGraph,
     accept_refreshed_token,
     apply_filing,
     dry_run_account,
+    graph_path,
     list_inbox,
 )
 from email_inbox_organizer.run_status import finalize_run
@@ -66,6 +68,22 @@ def test_dry_run_is_read_only_and_counts_review_mail():
     assert summary["left_for_review"] == 1
     assert summary["filed"] == 0
     assert summary["by_folder"] == {"Newsletters": 1, "Security": 1}
+
+
+def test_read_and_flag_safety_cannot_be_disabled_by_rules():
+    permissive = {**RULES, "never_move_unread": False, "skip_flagged": False}
+    unread = {"id": "u", "subject": "Club newsletter", "isRead": False,
+              "from": {"emailAddress": {"address": "deals@news.example"}}}
+    flagged = {"id": "f", "subject": "Club newsletter", "isRead": True,
+               "flag": {"flagStatus": "flagged"},
+               "from": {"emailAddress": {"address": "deals@news.example"}}}
+    unknown = {"id": "x", "subject": "Club newsletter",
+               "from": {"emailAddress": {"address": "deals@news.example"}}}
+    summary = dry_run_account(ReadOnlyGraph(lambda *_: {"value": [unread, flagged, unknown]}), permissive)
+    assert summary["would_file"] == 0
+    assert summary["left_unread"] == 1
+    assert summary["left_flagged"] == 1
+    assert summary["left_for_review"] == 1
 
 
 def test_apply_stays_disabled():
@@ -150,6 +168,43 @@ def test_next_link_pagination_and_incomplete_scan():
     else:
         incomplete = False
     assert incomplete is True
+
+
+def test_graph_next_links_and_mailbox_pages_are_validated():
+    assert graph_path("https://graph.microsoft.com/v1.0/me/messages?$skiptoken=x") == "/me/messages?$skiptoken=x"
+    assert graph_path("/me/messages") == "/me/messages"
+    for unsafe in (
+        "//evil.example/me/messages",
+        "https://graph.microsoft.com.evil.example/v1.0/me/messages",
+        "http://graph.microsoft.com/v1.0/me/messages",
+        "https://graph.microsoft.com/v2.0/me/messages",
+        "https://graph.microsoft.com/v1.0/me/messages#fragment",
+        "https://graph.microsoft.com/v1.0\\@evil.example/me/messages",
+        None,
+    ):
+        try:
+            graph_path(unsafe)
+        except GraphError:
+            pass
+        else:
+            raise AssertionError(f"unsafe Graph link accepted: {unsafe!r}")
+
+    def repeated(_method, _path, _query, _body):
+        return {"value": [{"id": "same"}], "@odata.nextLink": "https://graph.microsoft.com/v1.0/me/messages?page=next"}
+
+    try:
+        list_inbox(ReadOnlyGraph(repeated))
+    except GraphError as exc:
+        assert "duplicate" in str(exc)
+    else:
+        raise AssertionError("duplicate message across pages must fail closed")
+
+    try:
+        list_inbox(ReadOnlyGraph(lambda *_: {"value": {"not": "a list"}}))
+    except GraphError as exc:
+        assert "invalid mailbox page" in str(exc)
+    else:
+        raise AssertionError("malformed Graph page must fail closed")
 
 
 def stored_result():
