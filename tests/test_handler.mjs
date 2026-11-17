@@ -154,10 +154,18 @@ test('unread recheck skips, pagination completes, partial scan blocks',async()=>
   await reset();const p2=await preview();fault.partial=true;assert.equal((await call(applyBody(p2))).action,'failed');assert.equal(moves.length,0);
 });
 test('malformed, duplicate, and looping Graph pages fail closed',async()=>{
-  for(const key of ['malformed','duplicate','loop','badNext','schemeRelative','emptyNext','folderEmptyNext']) {
+  for(const key of ['malformed','duplicate','loop','badNext','schemeRelative','emptyNext']) {
     await reset();fault[key]=true;const r=await preview();assert.equal(r.action,'failed',key);assert.equal(r.results[0].error,'account scan failed',key);
     assert.ok(pages <= 2,`${key} should stop promptly`);
   }
+});
+test('empty folder continuation link fails closed during apply',async()=>{
+  await reset();
+  const p=await preview();
+  fault.folderEmptyNext=true;
+  const r=await call(applyBody(p));
+  assert.equal(r.action,'failed');
+  assert.equal(moves.length,0);
 });
 test('rotation failure prevents mailbox scan and releases lease',async()=>{await reset();const p=await preview();const before=pages;fault.rotation=true;const r=await call(applyBody(p));assert.equal(r.action,'failed');assert.equal(pages,before);assert.equal(rotations,1);assert.equal((await journal()).active,false);});
 test('different run keys cannot overlap same account',async()=>{
