@@ -459,7 +459,7 @@ async function listInbox(accessToken: string) {
       messages.push(message);
     }
     const link = page["@odata.nextLink"];
-    if (link !== undefined && link !== null && typeof link !== "string") throw new Error("unexpected Graph next link");
+    if (link !== undefined && link !== null && (typeof link !== "string" || link.length === 0)) throw new Error("unexpected Graph next link");
     next = link ?? null;
     if (next && messages.length >= 10000) return { messages, complete: false, inboxId: inbox.id };
   }
@@ -497,7 +497,7 @@ async function resolveDestinationFolders(accessToken: string, names: string[]) {
       result.set(name, folder.id);
     }
     const link = page["@odata.nextLink"];
-    if (link !== undefined && link !== null && typeof link !== "string") throw new Error("unexpected Graph next link");
+    if (link !== undefined && link !== null && (typeof link !== "string" || link.length === 0)) throw new Error("unexpected Graph next link");
     next = link ?? null;
   }
   if (result.size !== wanted.size) throw new Error("destination folder missing");
@@ -520,8 +520,19 @@ async function moveMessage(accessToken: string, messageId: string, destinationId
 
 async function graphFetch(accessToken: string, url: string) {
   // Never send the mailbox token off-host, including via @odata.nextLink.
-  if (!url.startsWith(`${GRAPH}/`)) throw new Error("unexpected Graph URL");
-  const response = await fetch(url, { headers: { authorization: `Bearer ${accessToken}`, prefer: 'IdType="ImmutableId"' } });
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new Error("unexpected Graph URL");
+  }
+  const graphOrigin = new URL(GRAPH).origin;
+  if (url.includes("\\") || parsed.protocol !== "https:" || parsed.origin !== graphOrigin ||
+      parsed.username || parsed.password || parsed.hash || !parsed.pathname.startsWith("/v1.0/") ||
+      parsed.pathname.includes("//") || /%2f|%5c/i.test(parsed.pathname)) {
+    throw new Error("unexpected Graph URL");
+  }
+  const response = await fetch(parsed.href, { headers: { authorization: `Bearer ${accessToken}`, prefer: 'IdType="ImmutableId"' } });
   if (!response.ok) throw new Error("mailbox request failed");
   return response;
 }
