@@ -38,6 +38,10 @@ def graph_path(link):
     if parsed.scheme != "https" or parsed.netloc != GRAPH_HOST or not parsed.path.startswith("/v1.0/"):
         raise GraphError("unexpected Graph next link")
     path = parsed.path[len("/v1.0"):]
+    # A Graph URL like /v1.0//host would become a scheme-relative URL if a
+    # transport joins this returned path against the Graph origin.
+    if path.startswith("//") or "%2f" in path.lower() or "%5c" in path.lower():
+        raise GraphError("unexpected Graph next link")
     if parsed.query:
         path = f"{path}?{parsed.query}"
     return path
