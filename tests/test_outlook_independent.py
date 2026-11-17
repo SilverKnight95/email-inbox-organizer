@@ -178,6 +178,8 @@ def test_graph_next_links_and_mailbox_pages_are_validated():
         "https://graph.microsoft.com.evil.example/v1.0/me/messages",
         "http://graph.microsoft.com/v1.0/me/messages",
         "https://graph.microsoft.com/v2.0/me/messages",
+        "https://graph.microsoft.com/v1.0//evil.example/me/messages",
+        "https://graph.microsoft.com/v1.0/%2f%2fevil.example/me/messages",
         "https://graph.microsoft.com/v1.0/me/messages#fragment",
         "https://graph.microsoft.com/v1.0\\@evil.example/me/messages",
         None,
