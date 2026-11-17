@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { manualBatch, previewDigest, MAX_MANUAL_MOVES } from "../supabase/functions/outlook-sort/apply.ts";
-import { resolveSlot } from "../supabase/functions/outlook-sort/auth.ts";
+import { manualSlot, resolveSlot } from "../supabase/functions/outlook-sort/auth.ts";
 import { classifyInbox, previewMoves } from "../supabase/functions/outlook-sort/policy.ts";
 
 const at = new Date("2026-09-28T12:00:00Z");
@@ -8,6 +8,8 @@ assert.equal(resolveSlot({ apply: true }, at).status, 403, "scheduled apply must
 assert.equal(resolveSlot({ manual: true, apply: true, run_key: "apply001" }, at).apply, true);
 assert.equal(resolveSlot({ manual: true, apply: true, preview: true, run_key: "apply001" }, at).status, 400);
 assert.equal(resolveSlot({ manual: true, apply: false, run_key: "preview001" }, at).apply, false);
+assert.throws(() => manualSlot({}), /invalid manual run key/);
+assert.throws(() => manualSlot(null), /invalid manual run key/);
 
 const rules = { auto_file: [{ match: "domain", value: "offers.example", folder: "Promotions" }] };
 const messages = [

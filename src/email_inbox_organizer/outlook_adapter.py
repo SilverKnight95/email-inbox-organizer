@@ -28,16 +28,20 @@ class ReadOnlyGraph:
 
 
 def graph_path(link):
-    if not link:
-        return None
-    if link.startswith("/"):
-        return link
-    parsed = urlparse(link)
-    if parsed.netloc != GRAPH_HOST:
+    if not isinstance(link, str) or not link:
         raise GraphError("unexpected Graph next link")
-    path = parsed.path
-    if path.startswith("/v1.0"):
-        path = path[len("/v1.0"):]
+    parsed = urlparse(link)
+    if parsed.fragment or "\\" in link:
+        raise GraphError("unexpected Graph next link")
+    if link.startswith("/") and not link.startswith("//") and not parsed.netloc:
+        return link
+    if parsed.scheme != "https" or parsed.netloc != GRAPH_HOST or not parsed.path.startswith("/v1.0/"):
+        raise GraphError("unexpected Graph next link")
+    path = parsed.path[len("/v1.0"):]
+    # A Graph URL like /v1.0//host would become a scheme-relative URL if a
+    # transport joins this returned path against the Graph origin.
+    if path.startswith("//") or "%2f" in path.lower() or "%5c" in path.lower():
+        raise GraphError("unexpected Graph next link")
     if parsed.query:
         path = f"{path}?{parsed.query}"
     return path
@@ -50,13 +54,24 @@ def list_inbox(graph):
         "$select": "id,subject,from,isRead,flag,parentFolderId",
     }
     messages = []
+    seen_pages = set()
+    seen_messages = set()
     while path:
+        if path in seen_pages or len(seen_pages) >= 1000:
+            raise GraphError("repeated or excessive mailbox pages")
+        seen_pages.add(path)
         page = graph.request("GET", path, query)
         query = None
-        values = page.get("value") or []
-        messages.extend(values)
+        if not isinstance(page, dict) or not isinstance(page.get("value"), list):
+            raise GraphError("invalid mailbox page")
+        for message in page["value"]:
+            message_id = message.get("id") if isinstance(message, dict) else None
+            if not isinstance(message_id, str) or not message_id or message_id in seen_messages:
+                raise GraphError("invalid or duplicate message")
+            seen_messages.add(message_id)
+            messages.append(message)
         nxt = page.get("@odata.nextLink")
-        if not nxt:
+        if nxt is None:
             return messages, True
         if len(messages) >= MAX_MESSAGES:
             return messages, False

@@ -43,9 +43,13 @@ def classify(message, rules):
     email, name = sender_of(message)
     domain = email.split("@")[-1] if "@" in email else email
     subject = subject_of(message)
-    if rules.get("never_move_unread", True) and not message.get("isRead", True):
+    # Filing is always gated on an explicitly read message. Rule settings may
+    # tighten this policy, but must never disable the safety boundary.
+    if message.get("isRead") is False:
         return {"action": "skip", "reason": "unread", "email": email, "folder": None}
-    if rules.get("skip_flagged", True) and is_flagged(message):
+    if message.get("isRead") is not True:
+        return {"action": "leave", "reason": "unknown read state", "email": email, "folder": None}
+    if is_flagged(message):
         return {"action": "skip", "reason": "flagged", "email": email, "folder": None}
     if subject.lower().startswith("inbox digest"):
         return {"action": "skip", "reason": "digest", "email": email, "folder": None}
