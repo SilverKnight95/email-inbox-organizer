@@ -17,8 +17,14 @@ export async function handler(request: Request): Promise<Response> {
   if (!invocationAllowed(request.headers.get("authorization"), Deno.env.get("ORGANIZER_INVOKE_SECRET"))) {
     return json({ error: "unauthorized" }, 401);
   }
-  const parsed = await request.json().catch(() => ({}));
-  const body: RequestBody = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+  const parsed: unknown = await request.json().catch(() => null);
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed) ||
+      ["manual", "preview", "apply"].some((key) => key in parsed && typeof (parsed as Record<string, unknown>)[key] !== "boolean") ||
+      ["run_key", "preview_run_key", "account_label", "preview_hash", "confirmation"].some((key) =>
+        key in parsed && typeof (parsed as Record<string, unknown>)[key] !== "string")) {
+    return json({ error: "invalid request body" }, 400);
+  }
+  const body = parsed as RequestBody;
   if (body.preview === true && body.manual !== true) return json({ error: "preview requires a manual run" }, 400);
 
   const applying = body.apply === true;
@@ -35,9 +41,12 @@ export async function handler(request: Request): Promise<Response> {
 
   const selected = body.manual === true ? body.account_label : undefined;
   if (selected !== undefined && !ACCOUNT_LABELS.has(selected)) return json({ error: "unknown account label" }, 400);
-  const supabase = supabaseClient();
+  let supabase: ReturnType<typeof supabaseClient>;
   let claimed: string | null;
-  try { claimed = await supabase.rpcClaim(slot, body.preview === true); }
+  try {
+    supabase = supabaseClient();
+    claimed = await supabase.rpcClaim(slot, body.preview === true);
+  }
   catch { return json({ action: "failed", error: "run claim was not saved" }, 503); }
   if (!claimed) return json({ action: "skip", reason: "duplicate", slot });
 
@@ -48,7 +57,11 @@ export async function handler(request: Request): Promise<Response> {
     await supabase.finish(claimed, "failed");
     return json({ action: "failed", slot, error: "account list was not read" }, 500);
   }
-  if (accounts.length !== (selected ? 1 : 3)) {
+  const expectedLabels = selected ? new Set([selected]) : ACCOUNT_LABELS;
+  if (accounts.length !== expectedLabels.size ||
+      new Set(accounts.map((account) => account?.label)).size !== expectedLabels.size ||
+      accounts.some((account) => !account || !expectedLabels.has(account.label) ||
+        account.provider !== "outlook" || account.role !== "personal" || typeof account.enabled !== "boolean")) {
     await supabase.finish(claimed, "failed");
     return json({ action: "failed", slot, error: selected ? "selected personal Outlook account is unavailable" : "expected three configured personal Outlook accounts" }, 500);
   }
@@ -118,8 +131,8 @@ export async function handler(request: Request): Promise<Response> {
           preview_hash: previewHash,
         } : {}),
       });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "account run failed";
+    } catch {
+      const message = "account scan failed";
       const stored = await supabase.saveResult(claimed, account.id, blankSummary(), {
         mode: "dry_run",
         filed: 0,
@@ -429,12 +442,25 @@ async function listInbox(accessToken: string) {
   const inbox = await folderResponse.json();
   if (typeof inbox.id !== "string") throw new Error("inbox was not identified");
   const messages = [];
+  const seenPages = new Set<string>();
+  const seenMessages = new Set<string>();
   let next: string | null = `${GRAPH}/me/mailFolders/inbox/messages?$top=50&$select=id,subject,from,isRead,flag,parentFolderId`;
   while (next) {
+    if (seenPages.has(next) || seenPages.size >= 1000) throw new Error("repeated or excessive mailbox pages");
+    seenPages.add(next);
     const response = await graphFetch(accessToken, next);
     const page = await response.json();
-    messages.push(...(page.value ?? []));
-    next = page["@odata.nextLink"] ?? null;
+    if (!page || typeof page !== "object" || !Array.isArray(page.value)) throw new Error("invalid mailbox page");
+    for (const message of page.value) {
+      if (!message || typeof message !== "object" || typeof message.id !== "string" || !message.id || seenMessages.has(message.id)) {
+        throw new Error("invalid or duplicate mailbox message");
+      }
+      seenMessages.add(message.id);
+      messages.push(message);
+    }
+    const link = page["@odata.nextLink"];
+    if (link !== undefined && link !== null && typeof link !== "string") throw new Error("unexpected Graph next link");
+    next = link ?? null;
     if (next && messages.length >= 10000) return { messages, complete: false, inboxId: inbox.id };
   }
   return { messages, complete: true, inboxId: inbox.id };
@@ -449,11 +475,15 @@ async function resolveDestinationFolders(accessToken: string, names: string[]) {
   const wantedFolded = new Set([...wanted].map((name) => name.trim().toLowerCase()));
   const result = new Map<string, string>();
   const seenFolded = new Set<string>();
+  const seenPages = new Set<string>();
   let next: string | null = `${GRAPH}/me/mailFolders?$top=100&$select=id,displayName,parentFolderId`;
   while (next) {
+    if (seenPages.has(next) || seenPages.size >= 1000) throw new Error("repeated or excessive folder pages");
+    seenPages.add(next);
     const response = await graphFetch(accessToken, next);
     const page = await response.json();
-    for (const folder of page.value ?? []) {
+    if (!page || typeof page !== "object" || !Array.isArray(page.value)) throw new Error("invalid folder page");
+    for (const folder of page.value) {
       const name = String(folder.displayName ?? "");
       const folded = name.trim().toLowerCase();
       if (!wantedFolded.has(folded)) continue;
@@ -466,7 +496,9 @@ async function resolveDestinationFolders(accessToken: string, names: string[]) {
       if (typeof folder.id !== "string") throw new Error("destination folder id missing");
       result.set(name, folder.id);
     }
-    next = page["@odata.nextLink"] ?? null;
+    const link = page["@odata.nextLink"];
+    if (link !== undefined && link !== null && typeof link !== "string") throw new Error("unexpected Graph next link");
+    next = link ?? null;
   }
   if (result.size !== wanted.size) throw new Error("destination folder missing");
   return result;
