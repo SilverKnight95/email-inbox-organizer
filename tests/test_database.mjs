@@ -83,12 +83,12 @@ async function storedRefreshCredential(accountId) {
 }
 
 test('reauthorization rejects a null account key and always resets filing approval',async()=>{
-  await db.exec(`create or replace function vault.create_secret(secret text, name text) returns uuid language plpgsql as $
+  await db.exec(`create or replace function vault.create_secret(secret text, name text) returns uuid language plpgsql as $$
     declare created uuid := gen_random_uuid(); begin
       insert into vault.decrypted_secrets(id,decrypted_secret) values(created,secret); return created;
-    end $;
-    create or replace function vault.update_secret(secret_id uuid, secret text) returns void language plpgsql as $
-    begin update vault.decrypted_secrets set decrypted_secret=secret where id=secret_id; end $;`);
+    end $$;
+    create or replace function vault.update_secret(secret_id uuid, secret text) returns void language plpgsql as $$
+    begin update vault.decrypted_secrets set decrypted_secret=secret where id=secret_id; end $$;`);
   const row=(await db.query("update organizer_accounts set account_key='fingerprint-1',enabled=true,apply_enabled=true where label='personal-outlook-1' returning id")).rows[0];
   await rpc(db,'organizer_store_refresh_token_by_label',{account_label:'personal-outlook-1',token:'synthetic-token',account_key:'fingerprint-1'});
   assert.equal(await storedRefreshCredential(row.id),'synthetic-token');
