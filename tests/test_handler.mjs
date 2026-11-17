@@ -26,6 +26,7 @@ globalThis.fetch=async(input,options={})=>{
   const url=new URL(input); const body=options.body && typeof options.body==='string'?JSON.parse(options.body):{};
   if(url.hostname==='db.test') {
     const name=url.pathname.split('/').at(-1);
+    if(name==='organizer_accounts' && fault.accountRows) return response(fault.accountRows);
     if(url.pathname.includes('/rpc/')) {
       if(name==='organizer_refresh_token') return response('synthetic-refresh');
       if(name==='organizer_store_refresh_token') { rotations++; if(fault.rotation) return response({},500);return response(null); }
@@ -82,6 +83,11 @@ globalThis.fetch=async(input,options={})=>{
   if(url.pathname.endsWith('/inbox/messages')) {
     pages++;
     if(fault.partial) return response({value:Array.from({length:10000},(_,i)=>sample('m'+i)),'@odata.nextLink':'https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages?more=1'});
+    if(fault.loop) return response({value:[sample('loop-message')],'@odata.nextLink':url.href});
+    if(fault.malformed) return response({value:{not:'a list'}});
+    if(fault.badNext) return response({value:[sample('bad-next')],'@odata.nextLink':'https://evil.example/steal'});
+    if(fault.duplicate && !url.searchParams.has('more')) return response({value:[sample('duplicate-message')],'@odata.nextLink':'https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages?more=1'});
+    if(fault.duplicate) return response({value:[sample('duplicate-message')]});
     if(fault.pagination && !url.searchParams.has('more')) return response({value:messages.slice(0,1),'@odata.nextLink':'https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages?more=1'});
     return response({value:fault.pagination?messages.slice(1):messages});
   }
@@ -95,6 +101,10 @@ globalThis.fetch=async(input,options={})=>{
 };
 async function call(body) {
   const result=await handler(new Request('https://function.test',{method:'POST',headers:{authorization:'Bearer synthetic-invoke','content-type':'application/json'},body:JSON.stringify(body)}));
+  return {status:result.status,...await result.json()};
+}
+async function callRaw(body) {
+  const result=await handler(new Request('https://function.test',{method:'POST',headers:{authorization:'Bearer synthetic-invoke','content-type':'application/json'},body}));
   return {status:result.status,...await result.json()};
 }
 const key=()=>`test-run-${++serial}`;
@@ -111,6 +121,18 @@ test('one selected account works with the other two disabled; permanent duplicat
 });
 test('all-account preview reports disabled accounts explicitly',async()=>{await reset();const p=await preview({account_label:undefined});assert.equal(p.results.length,3);assert.equal(p.results.filter(r=>r.error==='account disabled').length,2);assert.equal(refreshes,1);});
 test('disabled and invalid selections do not read mail',async()=>{await reset();assert.equal((await preview({account_label:'college'})).status,400);const p=await preview({account_label:'personal-outlook-2'});assert.equal(p.results[0].error,'account disabled');assert.equal(refreshes,0);});
+test('malformed request fields fail before a run is claimed',async()=>{
+  await reset();
+  for(const body of ['null','[]','{"manual":"yes"}','{"run_key":42}','{"account_label":[]}','{']) {
+    const r=await callRaw(body);assert.equal(r.status,400,body);
+  }
+  assert.equal((await db.query('select count(*)::int as n from organizer_runs')).rows[0].n,0);
+});
+test('unexpected or duplicate account rows fail before mailbox reads',async()=>{
+  await reset();
+  fault.accountRows=[{id:account,label:'personal-outlook-2',provider:'outlook',role:'personal',enabled:true,apply_enabled:false}];
+  const r=await preview();assert.equal(r.action,'failed');assert.equal(pages,0);
+});
 test('preview lookup and changed preview reject before moving',async()=>{
   await reset();const p=await preview();const b=applyBody(p);b.preview_run_key='missing-preview';assert.equal((await call(b)).action,'failed');assert.equal(moves.length,0);
   messages[0].subject='Different seasonal special';assert.equal((await call(applyBody(p))).action,'failed');assert.equal(moves.length,0);
@@ -124,6 +146,12 @@ test('missing/unknown/completed flag state is held in preview and immediate rech
 test('unread recheck skips, pagination completes, partial scan blocks',async()=>{
   await reset();fault.pagination=true;const p=await preview();assert.equal(p.results[0].apply_batch_size,2);assert.equal(pages,2);fault.unread=true;assert.equal((await call(applyBody(p))).results[0].skipped,2);assert.equal(moves.length,0);
   await reset();const p2=await preview();fault.partial=true;assert.equal((await call(applyBody(p2))).action,'failed');assert.equal(moves.length,0);
+});
+test('malformed, duplicate, and looping Graph pages fail closed',async()=>{
+  for(const key of ['malformed','duplicate','loop','badNext']) {
+    await reset();fault[key]=true;const r=await preview();assert.equal(r.action,'failed',key);assert.equal(r.results[0].error,'account scan failed',key);
+    assert.ok(pages <= 2,`${key} should stop promptly`);
+  }
 });
 test('rotation failure prevents mailbox scan and releases lease',async()=>{await reset();const p=await preview();const before=pages;fault.rotation=true;const r=await call(applyBody(p));assert.equal(r.action,'failed');assert.equal(pages,before);assert.equal(rotations,1);assert.equal((await journal()).active,false);});
 test('different run keys cannot overlap same account',async()=>{
